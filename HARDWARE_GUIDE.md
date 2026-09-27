@@ -31,7 +31,6 @@ shows the alert state. The laptop does all the "thinking".
 | MPU6050 | ✅ **most important** | Motion + posture: walking, trotting, lying, sitting |
 | RGB LED | ✅ | Shows the rule state on the dog (green/amber/red). Looks good on video |
 | Push button A | ✅ | "Event marker": the handler presses it when the dog changes activity (these presses become our labels) |
-| Toggle switch | ✅ | Recording on/off |
 | Push button B | Spare | |
 | Condenser mic + 2× 2.2k | ✅ simple use | Detects loud sounds *at the dog*: tells us whether a bark came from our dog or somewhere else. (Recognising bark vs whine is the laptop mic's job; without an amplifier this mic can't do that.) |
 | 16×2 LCD | ❌ skip | It can't go on a dog and we only have one ESP32 |
@@ -90,7 +89,7 @@ but please **borrow 3 resistors** from another team or the organisers. (If your 
 | SCL | **SCL / IO5** |
 | (XDA, XCL, AD0, INT) | leave unconnected |
 
-### Step 3: Wire the LED, buttons and switch (10 min)
+### Step 3: Wire the LED and buttons (10 min)
 
 | Part | Connect |
 |---|---|
@@ -100,7 +99,6 @@ but please **borrow 3 resistors** from another team or the organisers. (If your 
 | RGB LED long leg (common) | **GND** if it's common-cathode, **3.3V** if it's common-anode (see below) |
 | Button A (event marker) | one side → **IO6 (D6)**, other side → **GND** |
 | Button B (spare) | one side → **IO3 (A3)**, other side → **GND** |
-| Toggle switch | middle pin → **IO7 (D7)**, one outer pin → **GND** |
 
 - No pull-up resistors are needed for the buttons; the ESP32 has them built in.
 - **Which kind of LED do we have?** Try the long leg on GND first. If the colours come out inverted
@@ -248,6 +246,6 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 - `PLAN.md`: the overall 3-hour plan (hardware + software + deck)
 
 **Data format** (one line per sample, 50 per second):
-`seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, rec, loud`
+`seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, loud`
 (`mic` = sound level at the collar over the last 20 ms; `loud` = 1 when it's well above background)
 The recorded CSV also adds `t_laptop` (Unix time) as the first column, used to sync with the video.

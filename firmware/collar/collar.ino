@@ -1,6 +1,6 @@
 // PawPatrol collar firmware: Glyph ESP32-C6 + MPU6050 + electret mic (+ RGB LED, buttons)
 // Streams one CSV line per sample over Wi-Fi UDP at 50 Hz:
-//   seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec,loud
+//   seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,loud
 //   accel in g, gyro in deg/s, mic = peak-to-peak ADC counts over the last 20 ms (0 if unused),
 //   buttons 1 = pressed, loud = 1 if the mic is well above its background level (onboard LED flashes)
 // Listens for LED commands on CMD_PORT: "CALM", "ATTN", "ALERT", "OFF" or "LED r g b" (0-255)
@@ -26,7 +26,6 @@ const int SCL_PIN   = 5;   // board label SCL
 const int MIC_PIN   = 2;   // A2 (analog)
 const int BTN_A_PIN = 6;   // D6, button to GND: "event marker"
 const int BTN_B_PIN = 3;   // A3, button to GND: spare
-const int REC_PIN   = 7;   // D7, toggle switch to GND: recording on/off
 const int LED_R_PIN = 18;  // D18
 const int LED_G_PIN = 19;  // D19
 const int LED_B_PIN = 20;  // D20
@@ -152,7 +151,6 @@ void setup() {
   pinMode(BOARD_LED, OUTPUT);
   pinMode(BTN_A_PIN, INPUT_PULLUP);
   pinMode(BTN_B_PIN, INPUT_PULLUP);
-  pinMode(REC_PIN, INPUT_PULLUP);
   pinMode(LED_R_PIN, OUTPUT);
   pinMode(LED_G_PIN, OUTPUT);
   pinMode(LED_B_PIN, OUTPUT);
@@ -185,10 +183,10 @@ void loop() {
   bool loud;
   int mic = micTakeLevel(loud);
   char line[160];
-  int len = snprintf(line, sizeof(line), "%lu,%lu,%.3f,%.3f,%.3f,%.1f,%.1f,%.1f,%d,%d,%d,%d,%d\n",
+  int len = snprintf(line, sizeof(line), "%lu,%lu,%.3f,%.3f,%.3f,%.1f,%.1f,%.1f,%d,%d,%d,%d\n",
                      (unsigned long)seq++, (unsigned long)millis(),
                      a[0], a[1], a[2], g[0], g[1], g[2], mic,
-                     !digitalRead(BTN_A_PIN), !digitalRead(BTN_B_PIN), !digitalRead(REC_PIN), loud);
+                     !digitalRead(BTN_A_PIN), !digitalRead(BTN_B_PIN), loud);
   udp.beginPacket(laptop, DATA_PORT);
   udp.write((const uint8_t*)line, len);
   udp.endPacket();

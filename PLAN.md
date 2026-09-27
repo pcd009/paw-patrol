@@ -37,12 +37,12 @@ he settled on his bed after. Confidence: medium. No action needed."*
   classification with the laptop mic + YAMNet. Drop entirely if it eats >15 min.
 - **16x2 LCD: bench only / skip.** It can't live on a collar and we have one MCU. If there's a spare 15 min, it's a
   "base station" prop for the video; otherwise drop. Owner-facing output = the dashboard (phone-viewable).
-- **Buttons/toggle = ground-truth labeling** during the real-dog session: toggle = recording on/off,
+- **Buttons = ground-truth labeling** during the real-dog session:
   button A = "event marker" (handler presses when something notable happens) → lets us show accuracy vs truth.
 - **RGB LED on collar** = rule-engine state, visible in the video.
 - Pins (verify against the Glyph C6 MCP/pinout before wiring): avoid strapping GPIO8/9/15 and USB GPIO12/13;
   onboard LED is GPIO14. MPU6050 on any two free GPIOs as I2C SDA/SCL at 3.3 V; mic (if used) on an ADC pin
-  (GPIO0–6); RGB LED on 3 free GPIOs via PWM with resistors; button + toggle with INPUT_PULLUP.
+  (GPIO0–6); RGB LED on 3 free GPIOs via PWM with resistors; buttons with INPUT_PULLUP.
 
 ## IMU activity classifier (fast, explainable)
 Per 2 s window, 50% overlap, after a 3 s "standing still" calibration to get gravity direction:

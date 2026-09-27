@@ -15,7 +15,7 @@ import time
 
 DATA_PORT = 4210
 CMD_PORT = 4211
-FIELDS = "seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec,loud".split(",")
+FIELDS = "seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,loud".split(",")
 
 
 def main():
@@ -90,7 +90,7 @@ def main():
             rate = count / (now - last_print)
             print(f"{rate:5.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
                   f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} {'#' * min(int(s['mic']) // 20, 20):<20} | "
-                  f"A={s['btnA']} B={s['btnB']} rec={s['rec']} | dropped={dropped}")
+                  f"A={s['btnA']} B={s['btnB']} | dropped={dropped}")
             count, last_print = 0, now
 
 
