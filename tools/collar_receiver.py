@@ -15,7 +15,7 @@ import time
 
 DATA_PORT = 4210
 CMD_PORT = 4211
-FIELDS = "seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec".split(",")
+FIELDS = "seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec,loud".split(",")
 
 
 def main():
@@ -32,19 +32,23 @@ def main():
 
     def command_loop():
         while True:
-            cmd = input().strip()
+            try:
+                cmd = input().strip()
+            except EOFError:
+                return
             if cmd and collar["ip"]:
                 sock.sendto(cmd.upper().encode(), (collar["ip"], CMD_PORT))
                 print(f"-> sent {cmd.upper()} to {collar['ip']}")
 
     threading.Thread(target=command_loop, daemon=True).start()
 
-    out = open(args.record, "w") if args.record else None
+    out = open(args.record, "w", buffering=1) if args.record else None  # line-buffered: nothing lost if killed
     if out:
         out.write("t_laptop," + ",".join(FIELDS) + "\n")
 
     count, last_print, last_seq, dropped = 0, time.time(), None, 0
     btn_prev = 0
+    last_loud = 0.0
     while True:
         try:
             data, addr = sock.recvfrom(512)
@@ -73,6 +77,11 @@ def main():
             print(f"*** EVENT MARKER at {time.strftime('%H:%M:%S')} ***")
         btn_prev = int(s["btnA"])
 
+        # Loud sound at the collar = very likely the dog itself (bark/whine), not the TV
+        if int(s["loud"]) and now - last_loud > 1.0:
+            print(f"🔊 LOUD at collar {time.strftime('%H:%M:%S')} (mic={s['mic']})")
+            last_loud = now
+
         if now - last_print >= 0.5:
             ax, ay, az = float(s["ax"]), float(s["ay"]), float(s["az"])
             mag = math.sqrt(ax * ax + ay * ay + az * az)
@@ -80,7 +89,7 @@ def main():
             roll = math.degrees(math.atan2(ay, az))
             rate = count / (now - last_print)
             print(f"{rate:5.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
-                  f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} | "
+                  f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} {'#' * min(int(s['mic']) // 20, 20):<20} | "
                   f"A={s['btnA']} B={s['btnB']} rec={s['rec']} | dropped={dropped}")
             count, last_print = 0, now
 

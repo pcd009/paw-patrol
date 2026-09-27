@@ -1,7 +1,8 @@
-// PawPatrol collar firmware: Glyph ESP32-C6 + MPU6050 (+ optional mic, RGB LED, buttons)
+// PawPatrol collar firmware: Glyph ESP32-C6 + MPU6050 + electret mic (+ RGB LED, buttons)
 // Streams one CSV line per sample over Wi-Fi UDP at 50 Hz:
-//   seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec
-//   accel in g, gyro in deg/s, mic = peak-to-peak ADC counts (0 if unused), buttons 1 = pressed
+//   seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,rec,loud
+//   accel in g, gyro in deg/s, mic = peak-to-peak ADC counts over the last 20 ms (0 if unused),
+//   buttons 1 = pressed, loud = 1 if the mic is well above its background level (onboard LED flashes)
 // Listens for LED commands on CMD_PORT: "CALM", "ATTN", "ALERT", "OFF" or "LED r g b" (0-255)
 
 #include <WiFi.h>
@@ -13,7 +14,7 @@ const char* WIFI_SSID = "YOUR_HOTSPOT_NAME";   // 2.4 GHz only
 const char* WIFI_PASS = "YOUR_HOTSPOT_PASSWORD";
 const char* LAPTOP_IP = "192.168.0.100";       // laptop IP on the same hotspot
 const bool  LED_COMMON_ANODE = false;          // true if the LED's long leg goes to 3.3V
-const bool  USE_MIC = false;                   // true once the mic is wired on MIC_PIN
+const bool  USE_MIC = true;                    // false if the mic is not wired
 // --------------------------------
 
 const uint16_t DATA_PORT = 4210;  // ESP32 -> laptop
@@ -36,6 +37,8 @@ const float ACCEL_LSB_PER_G   = 4096.0;  // +-8 g range
 const float GYRO_LSB_PER_DPS  = 32.8;    // +-1000 deg/s range
 const uint32_t SAMPLE_US = 20000;        // 50 Hz
 const int LED_MAX = 80;                  // cap brightness (protects LED if no resistors)
+const float LOUD_FACTOR = 3.0;           // loud = mic above 3x background...
+const int   LOUD_MIN_COUNTS = 40;        // ...and at least this many ADC counts above it
 
 WiFiUDP udp;       // outgoing data
 WiFiUDP cmdUdp;    // incoming LED commands
@@ -43,6 +46,9 @@ IPAddress laptop;
 uint32_t seq = 0;
 uint32_t nextSampleUs = 0;
 bool mpuOk = false;
+int micLo = 4095, micHi = 0;   // min/max since the last packet
+float micFloor = -1;           // slowly-adapting background level
+uint32_t loudUntilMs = 0;
 
 void mpuWrite(uint8_t reg, uint8_t val) {
   Wire.beginTransmission(MPU_ADDR);
@@ -73,15 +79,27 @@ bool mpuRead(float a[3], float g[3]) {
   return true;
 }
 
-int micPeakToPeak() {
-  if (!USE_MIC) return 0;
-  int lo = 4095, hi = 0;
-  for (int i = 0; i < 40; i++) {
-    int s = analogRead(MIC_PIN);
-    if (s < lo) lo = s;
-    if (s > hi) hi = s;
-  }
-  return hi - lo;
+// Called as often as possible between IMU samples so short sounds aren't missed
+void micSample() {
+  if (!USE_MIC) return;
+  int s = analogRead(MIC_PIN);
+  if (s < micLo) micLo = s;
+  if (s > micHi) micHi = s;
+}
+
+// Peak-to-peak since the last call + loud flag; flashes the onboard LED on loud sounds
+int micTakeLevel(bool &loud) {
+  loud = false;
+  if (!USE_MIC || micHi < micLo) return 0;
+  int p2p = micHi - micLo;
+  micLo = 4095;
+  micHi = 0;
+  if (micFloor < 0) micFloor = p2p;
+  loud = p2p > micFloor * LOUD_FACTOR && p2p > micFloor + LOUD_MIN_COUNTS;
+  if (!loud) micFloor = 0.98 * micFloor + 0.02 * p2p;  // only learn background from quiet moments
+  if (loud) loudUntilMs = millis() + 150;
+  digitalWrite(BOARD_LED, millis() < loudUntilMs ? HIGH : LOW);
+  return p2p;
 }
 
 void setLed(int r, int g, int b) {
@@ -124,7 +142,7 @@ void connectWifi() {
     delay(250);
     Serial.print(".");
   }
-  digitalWrite(BOARD_LED, HIGH);
+  digitalWrite(BOARD_LED, LOW);  // off; flashes on loud sounds
   Serial.printf("\nConnected. ESP32 IP: %s\n", WiFi.localIP().toString().c_str());
   setLed(0, 255, 0);
 }
@@ -153,6 +171,7 @@ void setup() {
 void loop() {
   if (WiFi.status() != WL_CONNECTED) connectWifi();
   handleCommands();
+  micSample();
 
   if ((int32_t)(micros() - nextSampleUs) < 0) return;
   nextSampleUs += SAMPLE_US;
@@ -163,11 +182,13 @@ void loop() {
     setLed(255, 0, 255);  // purple = sensor problem
   }
 
+  bool loud;
+  int mic = micTakeLevel(loud);
   char line[160];
-  int len = snprintf(line, sizeof(line), "%lu,%lu,%.3f,%.3f,%.3f,%.1f,%.1f,%.1f,%d,%d,%d,%d\n",
+  int len = snprintf(line, sizeof(line), "%lu,%lu,%.3f,%.3f,%.3f,%.1f,%.1f,%.1f,%d,%d,%d,%d,%d\n",
                      (unsigned long)seq++, (unsigned long)millis(),
-                     a[0], a[1], a[2], g[0], g[1], g[2], micPeakToPeak(),
-                     !digitalRead(BTN_A_PIN), !digitalRead(BTN_B_PIN), !digitalRead(REC_PIN));
+                     a[0], a[1], a[2], g[0], g[1], g[2], mic,
+                     !digitalRead(BTN_A_PIN), !digitalRead(BTN_B_PIN), !digitalRead(REC_PIN), loud);
   udp.beginPacket(laptop, DATA_PORT);
   udp.write((const uint8_t*)line, len);
   udp.endPacket();

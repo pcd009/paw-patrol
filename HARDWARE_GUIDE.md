@@ -12,15 +12,15 @@ Follow it top to bottom. Each step ends with a **✅ Check**. Don't move on unti
  ┌──────────────────────────┐   Wi-Fi (UDP)   ┌──────────────────────────────────┐
  │ ESP32-C6 (Glyph)         │ ──────────────► │ collar_receiver.py               │
  │  + MPU6050 motion sensor │   50 samples/s  │  → activity (lying/sitting/      │
- │  + button (event marker) │                 │     walking/trotting/sniffing)   │
- │  + RGB LED (status)      │ ◄────────────── │  + webcam  → where the dog is    │
- │  + power bank / LiPo     │   LED commands  │  + laptop mic → bark / whine     │
- └──────────────────────────┘                 │  → rules (alerts) + Claude       │
-                                              │     (explanation)                │
+ │  + mic (loud = it's us)  │                 │     walking/trotting/sniffing)   │
+ │  + button (event marker) │                 │  + webcam  → where the dog is    │
+ │  + RGB LED (status)      │ ◄────────────── │  + laptop mic → bark / whine     │
+ │  + power bank / LiPo     │   LED commands  │  → rules (alerts) + Claude       │
+ └──────────────────────────┘                 │     (explanation)                │
                                               └──────────────────────────────────┘
 ```
 
-**Hardware's job:** a small unit on the dog's harness that streams motion data to the laptop, and an LED that
+**Hardware's job:** a small unit on the dog's harness that streams motion + sound level to the laptop, and an LED that
 shows the alert state. The laptop does all the "thinking".
 
 ### What we use, and what we skip
@@ -33,7 +33,7 @@ shows the alert state. The laptop does all the "thinking".
 | Push button A | ✅ | "Event marker": the handler presses it when the dog changes activity (these presses become our labels) |
 | Toggle switch | ✅ | Recording on/off |
 | Push button B | Spare | |
-| Condenser mic + 2× 2.2k | ⚠️ optional | Without an amplifier the signal is too weak to recognise barks. At best it tells us "something loud happened". **Real bark detection uses the laptop mic.** |
+| Condenser mic + 2× 2.2k | ✅ simple use | Detects loud sounds *at the dog*: tells us whether a bark came from our dog or somewhere else. (Recognising bark vs whine is the laptop mic's job; without an amplifier this mic can't do that.) |
 | 16×2 LCD | ❌ skip | It can't go on a dog and we only have one ESP32 |
 | Breadboard | Bench testing only | Too big and too loose for a dog. On the harness we wire directly with F-F jumpers |
 | Webcam + RTX 3050 | ✅ (SW track) | Where the dog is (door, bed, bowl) + video for the demo |
@@ -107,16 +107,32 @@ but please **borrow 3 resistors** from another team or the organisers. (If your 
   (on when they should be off), move the long leg to 3.3V and set `LED_COMMON_ANODE = true` in the firmware.
 - **Don't use IO8 or IO9**: they control boot mode and the board may not start.
 
-### Step 4 (optional, max 15 min): the mic
-Only do this if everything else already works.
+### Step 4: The mic (10 min)
+**Its one job: "was that sound from OUR dog?"** The laptop mic recognises bark vs whine. The mic on the harness sits
+right next to the dog's throat, so when it reads *loud* at the same moment, the sound almost certainly came from our
+dog and not from the TV or a dog outside. That's a nice bit of context for Claude, and a nice line for the pitch.
 
 | Mic | Connect |
 |---|---|
 | Mic **+** (the pin *not* connected to the metal case) | 2.2k resistor to **3.3V**, **and** a wire to **IO2 (A2)** |
 | Mic **−** (connected to the metal case) | **GND** |
 
-Set `USE_MIC = true` in the firmware. The `mic` value should jump when you clap next to it.
-If it barely moves, give up on it: the laptop mic handles barks.
+How it works (no amplifier needed for this):
+- The ESP32 reads the mic as fast as it can between motion samples and reports how much the signal swung
+  in each 20 ms slot (`mic` column).
+- It learns the background noise level by itself. When a sound is ~3× louder than the background, it sets
+  `loud = 1` and **flashes the onboard LED** (so you can see it working on video).
+- The receiver prints `🔊 LOUD at collar ...` for each loud event.
+
+**Test:** run the receiver, stay quiet for 5 s (so it learns the background), then clap or bark next to it →
+`🔊 LOUD` appears and the onboard LED flashes. Talking at normal volume from 1 m away should *not* trigger it.
+
+**Signal too weak?** (the `mic` value barely changes when you clap): put **both 2.2k resistors in series**
+(4.4k total) between 3.3V and mic +. That roughly doubles the signal. Still nothing after 10 min? Set
+`USE_MIC = false` and move on; the laptop mic still covers barks.
+
+**Too sensitive?** (LOUD fires all the time on the dog's own movement): raise `LOUD_FACTOR` (e.g. 3.0 → 5.0) at the
+top of the firmware.
 
 ### Step 5: Flash the collar firmware (10 min)
 1. Open `firmware/collar/collar.ino` in Arduino IDE.
@@ -139,6 +155,7 @@ If it barely moves, give up on it: the laptop mic handles barks.
 - Tilt the board: pitch/roll change
 - Shake it: `|a|` jumps above 2 g
 - Press button A: `*** EVENT MARKER ***` appears
+- Clap near the mic: `🔊 LOUD at collar` appears + the onboard LED flashes
 - Type `alert` + Enter in the receiver: the LED turns red. `calm` turns it green
 
 LED colours set by the firmware itself: **blue** = connecting to Wi-Fi, **purple** = motion sensor problem.
@@ -186,7 +203,7 @@ out loud so the video captures them):
 | 5 | Trot / jog next to the handler | 20 s |
 | 6 | Sniff: scatter a few treats on the floor | 20 s |
 | 7 | Walk to the "door" spot and wait there | 20 s |
-| 8 | Vocalisation: a doorbell sound on a phone, or a treat held just out of reach | 20 s |
+| 8 | Vocalisation: a doorbell sound on a phone, or a treat held just out of reach. **Also play a dog-bark video on a phone ~2 m away while the dog is quiet:** the laptop hears a bark but the collar stays quiet, which is exactly the "not our dog" case for the demo | 30 s |
 | 9 | Settle / lie down again | 20 s |
 
 Galloping probably won't happen on command, and that's fine: we say "supported, not demoed".
@@ -208,6 +225,8 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 | Serial shows data but the receiver shows nothing | Wrong `LAPTOP_IP` (re-check `ipconfig`), Windows firewall blocking Python, or you're running in WSL |
 | Rate well below 50 Hz / many dropped | Move closer to the phone; the power bank may be going to sleep (some turn off at low current, so use a different one) |
 | Purple LED | Motion sensor wire came loose. Re-tape |
+| `mic` always 0 | `USE_MIC` is false, or the mic wire isn't on IO2 |
+| `mic` jumps around with no sound | Mic wire loose, or mic + and − swapped |
 | LED colours inverted | Set `LED_COMMON_ANODE = true` |
 
 ---
@@ -229,5 +248,6 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 - `PLAN.md`: the overall 3-hour plan (hardware + software + deck)
 
 **Data format** (one line per sample, 50 per second):
-`seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, rec`
+`seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, rec, loud`
+(`mic` = sound level at the collar over the last 20 ms; `loud` = 1 when it's well above background)
 The recorded CSV also adds `t_laptop` (Unix time) as the first column, used to sync with the video.
