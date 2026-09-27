@@ -11,7 +11,10 @@ from __future__ import annotations
 import base64
 from typing import List, Sequence, Tuple
 
+from app.config import get as cfg_get
 from services.llm_common import call_claude_json, clamp01
+
+BREED = (cfg_get("dog", default={}) or {}).get("breed", "dog")
 
 POSTURES = ["walking", "trotting", "galloping", "standing", "sitting", "lying_on_chest"]
 # barking is left to the audio detector: it can't be judged reliably from a few silent frames
@@ -19,7 +22,7 @@ ACTIVITIES = ["none", "sniffing"]
 LABELS = POSTURES + ["sniffing"]
 
 SYSTEM_PROMPT = (
-    "You describe a pet dog (usually a Labrador retriever) for a home monitoring system. You get "
+    f"You describe a pet dog (a {BREED}) for a home monitoring system. You get "
     "a few cropped video frames of the same dog in time order, roughly 0.5 s apart. The camera "
     "may pan or follow the dog, so judge motion from the body and legs relative to the ground, "
     "not from where the dog sits in the frame. Report two things.\n"

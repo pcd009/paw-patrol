@@ -5,8 +5,8 @@ subject_id: demo_dog_01
 
 # Shown on the dashboard and used by Claude's daily summary.
 dog:
-  name: "Bruno"
-  breed: "Labrador Retriever"
+  name: "Coco"
+  breed: "Golden Retriever"
   age: "3 years"
   daily_activity_goal_min: 60   # active minutes (walking + running + exploring) per day
 
@@ -59,6 +59,18 @@ thresholds:
   segmenter:
     stable_window_s: 1.0
     max_segment_s: 5.0   # long behaviours are posted every N s so the timeline stays live
+
+# PawPatrol collar (../paw-patrol). Read from the files its receiver writes -- see app/io/collar.py.
+collar:
+  our_dog_mic_min: 15       # collar mic peak at a laptop-heard bark: >= this -> "our dog"
+  not_our_dog_mic_max: 8    # <= this -> "probably not our dog" (doesn't count towards bark alerts)
+  gait:                     # after calibration; starting points from COLLAR_DATA.md -- tune on the dog
+    still_mag_std: 0.02
+    still_gyro_dps: 5.0
+    moving_mag_std: 0.03    # below this = fidgeting, not travelling
+    walk_max_cadence: 2.0   # Hz; walking below, trotting above
+    trot_max_cadence: 3.0   # Hz; galloping above (or any peak over gallop_mag_max)
+    gallop_mag_max: 2.0     # g (calibrated)
 
 server:
   host: "0.0.0.0"

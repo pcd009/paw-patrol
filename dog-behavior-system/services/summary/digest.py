@@ -26,7 +26,7 @@ Rules:
 - No ids, no JSON field names, no technical words (events, detections, confidence).
 
 Fields:
-- headline: at most 8 words capturing the day so far, e.g. "A calm, sleepy day for Bruno".
+- headline: at most 8 words capturing the day so far, e.g. "A calm, sleepy day for Coco".
 - parts: one entry per part of the day that has observations, in time order, using the \
 day_log's "part" values (Early morning, Morning, Afternoon, Evening, Night). Each text is ONE \
 short sentence (max ~18 words) with the notable things and their times, e.g. "Whined briefly \

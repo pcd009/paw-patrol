@@ -44,7 +44,7 @@ def _fmt(secs: float) -> str:
 
 
 def _groups(events: List[dict]) -> List[dict]:
-    """Consecutive same-category events merged (blips < 20 s of another category absorbed)."""
+    """Consecutive same-category events merged (blips < 5 s of another category absorbed)."""
     timed = [e for e in events if e["label"] in LABEL_TO_CAT]
     groups: List[dict] = []
     for e in timed:
@@ -54,8 +54,8 @@ def _groups(events: List[dict]) -> List[dict]:
             g["end"] = max(g["end"], _ts(e["ended_at"]))
             g["seconds"] += _dur(e)
             continue
-        # absorb a short blip sandwiched between two runs of the same category
-        if len(groups) >= 2 and groups[-2]["cat"] == cat and groups[-1]["seconds"] < 20:
+        # absorb a short (<5 s) blip sandwiched between two runs of the same category
+        if len(groups) >= 2 and groups[-2]["cat"] == cat and groups[-1]["seconds"] < 5:
             blip = groups.pop()
             g = groups[-1]
             g["end"] = max(g["end"], _ts(e["ended_at"]))
@@ -187,7 +187,7 @@ def compute_summary(events: List[dict], alerts: List[dict], now: Optional[dateti
         "button_presses": len(presses),
         # demo-mode sample story (services/summary/demo_story.py) is tagged demo_seed
         "includes_demo_data": any(e.get("evidence", {}).get("detector") == "demo_seed" for e in events),
-        # real analysis of recorded clips placed at staged times (scripts/analyze_clips.py)
+        # events from processed recordings carry clip ids
         "from_recorded_clips": any("clip_id" in e.get("evidence", {}) for e in events),
         "last_event_at": _ts(events[-1]["ended_at"]).isoformat() if events else None,
         "collar": {"connected": bool(imu), "events": len(imu)},

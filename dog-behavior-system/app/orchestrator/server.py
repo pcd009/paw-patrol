@@ -86,6 +86,7 @@ class Store:
             sinks_cfg,
             serial_port=cfg_get("adapters", "serial_port"),
             webhook_url=cfg_get("adapters", "webhook_url"),
+            collar_session=os.environ.get("PAWPATROL_COLLAR") or None,  # collar LED mirrors the rule state
         )
 
 

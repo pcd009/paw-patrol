@@ -1,0 +1,3 @@
+[submodule "paw-patrol"]
+	path = paw-patrol
+	url = https://github.com/Devesh99/paw-patrol.git

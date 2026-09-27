@@ -53,7 +53,9 @@ def evaluate_rules(events: List[dict], existing_alerts: Optional[List[dict]] = N
         if a["rule_id"] not in last_fired or t > last_fired[a["rule_id"]]:
             last_fired[a["rule_id"]] = t
 
-    events = sorted(events, key=lambda e: e["started_at"])
+    # sounds the collar attributes to another dog (quiet at our dog's collar) never raise alerts
+    events = sorted((e for e in events if "collar:not_our_dog" not in e.get("evidence", {}).get("detector", "")),
+                    key=lambda e: e["started_at"])
     new_alerts: List[dict] = []
     for rule_id, rule in RULES.items():
         window = timedelta(seconds=rule["window_s"])

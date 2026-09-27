@@ -26,8 +26,45 @@ Claude turns what they see into a plain-language picture of the dog's day.
   (header: "Demo mode · sample story + live").
 - Each run records to its own file in `data/history/sessions/` (thumbnails in `data/history/thumbs/`).
 
-`scripts/analyze_clips.py` is an offline tool: it runs recorded clips through the same YOLO + Claude pipeline
-and writes the events to a day file, useful for checking labels on new footage.
+## Collar + recordings (camera, mic, gyro)
+
+The collar project (`../paw-patrol`) records the gyro/accelerometer + collar mic into session folders
+(`imu.csv`, `events.jsonl`, `live.json`) stamped with laptop Unix time. We read those files -- no shared code.
+Our side records the laptop camera + mic on the same clock:
+
+    data/recordings/<name>/  video.mp4  frames.csv (Unix time per frame)  audio.wav  audio.json (Unix start)
+
+How they combine (`services/fusion.py`, same live and offline): the **gyro decides gait** (walk/trot/gallop)
+while the dog moves and corrects video gait to "standing" when it's still; **Claude** keeps posture and
+sniffing; the **collar mic** marks each laptop-heard bark "our dog" (loud at the collar) or "not our dog"
+(quiet at the collar -> ignored by bark alerts); while the dog is off camera the collar still reports movement.
+The collar **LED mirrors the rule state** (green/amber/red) instantly.
+
+    # live, with the collar and recording everything
+    scripts/run_demo.sh live 0 mic --collar ../paw-patrol/sessions --record dog1
+
+    # or record separately (camera + mic only), next to the collar receiver
+    .venv/bin/python -m scripts.record --name dog1 --collar ../paw-patrol/sessions
+
+    # later: sync + process the whole sequence, then play it back in sync on the dashboard
+    .venv/bin/python -m scripts.process_session data/recordings/dog1 --collar ../paw-patrol/sessions/<session>
+    scripts/run_demo.sh playback data/recordings/dog1
+
+**Recording with a phone or the Mac camera + the collar on another machine** (the usual setup):
+
+    # collar laptop -- records until Ctrl-C, or until the collar is off 10 s
+    python tools/collar_receiver.py --out sessions/dog1 --stop-after-lost 10      # (in ../paw-patrol)
+    # phone / Mac: record video normally. At the start: press collar button A while clapping once on camera.
+    # then, on the Mac with Paw Patrol:
+    .venv/bin/python -m scripts.process_session IMG_1234.MOV --collar ../paw-patrol/sessions/dog1 --check-sync
+    .venv/bin/python -m scripts.process_session IMG_1234.MOV --collar ../paw-patrol/sessions/dog1
+    scripts/run_demo.sh playback data/recordings/IMG_1234
+
+The video's start time comes from its metadata (iPhone/Mac write it; else `--video-start`), each frame's own
+timestamp is used (phones record at a variable frame rate), and the clap is lined up with the button-A marker
+for exact sync across the two clocks (`--sync clap`, automatic when there's a marker; or `--sync mic`, `--offset`).
+If the collar receiver ran on another machine, pass `--offset S` or `--auto-sync` (clap near the collar at
+the start; both mics hear it). Collar thresholds live in `config.yaml` -> `collar`.
 
 ---
 

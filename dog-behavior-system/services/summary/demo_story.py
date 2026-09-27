@@ -1,4 +1,4 @@
-"""Demo mode: a pre-filled ~3-hour Labrador story ending at server start; live events then append.
+"""Demo mode: a pre-filled ~3-hour sample story ending at server start; live events then append.
 
 Every story event is tagged evidence.detector = "demo_seed" (the dashboard shows a demo badge).
 Alerts come from the real rule engine. Thumbnails are dog crops from data/demo_videos/, cut once

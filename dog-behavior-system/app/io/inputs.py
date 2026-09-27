@@ -19,7 +19,8 @@ class VideoSource:
     """Wraps cv2.VideoCapture. `source` is a webcam index ("0"), a file path, or an
     rtsp://... / http://... URL (e.g. a phone running an IP-cam app)."""
 
-    def __init__(self, source: str, target_fps: float = 8.0, loop_files: bool = True, max_width: int = 1280):
+    def __init__(self, source: str, target_fps: float = 8.0, loop_files: bool = True, max_width: int = 1280,
+                 recorder=None):
         self.source_raw = source
         self.target_fps = target_fps  # detection sampling rate; the display gets every frame
         self.loop_files = loop_files
@@ -30,6 +31,7 @@ class VideoSource:
         self.native_fps = 30.0
         self._reader = None
         self.ended = False
+        self.recorder = recorder  # app.io.recording.VideoRecorder: saves camera frames + Unix times
 
     def _resolve(self):
         s = self.source_raw
@@ -61,6 +63,8 @@ class VideoSource:
         native_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         native_fps = native_fps if native_fps > 0.1 else 30.0
         self.native_fps = native_fps
+        if self.recorder is not None:
+            self.recorder.fps = native_fps  # write the video at the camera's real rate
         period = 1.0 / native_fps
         t0 = time.monotonic()
         next_due = t0
@@ -76,6 +80,8 @@ class VideoSource:
             if w > self.max_width:
                 frame = cv2.resize(frame, (self.max_width, int(h * self.max_width / w)), interpolation=cv2.INTER_AREA)
             seq += 1
+            if self.recorder is not None and not is_file:
+                self.recorder.write(frame, time.time())
             with self._lock:
                 self._latest = (time.monotonic() - t0, frame, seq)
                 self._lock.notify_all()
@@ -124,11 +130,13 @@ class AudioSource:
     """Yields mono float32 PCM chunks at self.sample_rate. audio_detector.py buffers these
     into 1s windows with a 0.5s hop -- this class just supplies raw audio, live or from file."""
 
-    def __init__(self, source: Optional[str], sample_rate: int = 16000, chunk_s: float = 0.1, realtime: bool = True):
+    def __init__(self, source: Optional[str], sample_rate: int = 16000, chunk_s: float = 0.1, realtime: bool = True,
+                 recorder=None):
         self.source = source  # None | "mic" | path to wav/mp4
         self.sample_rate = sample_rate
         self.chunk_s = chunk_s
         self.realtime = realtime
+        self.recorder = recorder  # app.io.recording.AudioRecorder: saves mic audio + Unix start time
 
     def chunks(self) -> Iterator["np.ndarray"]:
         if self.source in (None, "none", ""):
@@ -144,11 +152,14 @@ class AudioSource:
         q: "queue.Queue" = queue.Queue()
 
         def cb(indata, frames, time_info, status):
-            q.put(indata[:, 0].copy())
+            q.put((time.time(), indata[:, 0].copy()))
 
         with sd.InputStream(samplerate=self.sample_rate, channels=1, blocksize=block, callback=cb):
             while True:
-                yield q.get()
+                t, chunk = q.get()
+                if self.recorder is not None:
+                    self.recorder.write(chunk, t)
+                yield chunk
 
     def _file_chunks(self) -> Iterator["np.ndarray"]:
         import librosa

@@ -10,11 +10,16 @@ from __future__ import annotations
 import json
 
 from contracts.common import SCHEMA_VERSION, new_id, now_iso
+from app.config import get as cfg_get
 from services.llm_common import call_claude_json, clamp01
+
+_DOG = cfg_get("dog", default={}) or {}
+DOG_NAME = _DOG.get("name", "the dog")
+BREED = _DOG.get("breed", "dog")
 
 DECISIONS = ["routine", "monitor", "notify", "insufficient_evidence"]
 
-SYSTEM_PROMPT = """You are an assistant that explains a pet Labrador retriever's recent behaviour \
+SYSTEM_PROMPT = f"""You are an assistant that explains {DOG_NAME}'s (a pet {BREED}) recent behaviour \
 to its owner, using ONLY the structured events and alerts in the context packet you are given.
 
 Rules you must follow:
@@ -25,8 +30,8 @@ hedged explanations ("this can indicate ...", not "your dog is ...").
 referenced_alert_ids. Only cite ids that are literally present in the context packet.
 - You cannot create, escalate, dismiss, or modify any alert. Alerts come from a separate \
 deterministic rule engine; you only explain them.
-- Be Labrador-aware (food-motivated, often vocalizes near mealtimes or the door, generally a \
-sturdy/even-tempered breed) but stay cautious: state uncertainty explicitly in the \
+- Use what is typical for a {BREED} as context (energy level, how vocal the breed tends to be) \
+but stay cautious: state uncertainty explicitly in the \
 `uncertainty` field, and if the evidence is thin or ambiguous prefer monitor or \
 insufficient_evidence over notify.
 - decision: routine (nothing notable), monitor (worth watching, not urgent), notify (owner \
