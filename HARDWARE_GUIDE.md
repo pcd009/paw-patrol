@@ -175,16 +175,16 @@ show up in the receiver.
 ### Step 7: Full dry run WITHOUT the dog (10 min)
 Do the entire dog script (below) with a human wearing or carrying the harness, while recording:
 ```
-python tools/collar_receiver.py --record sessions/dryrun_imu.csv
+python tools/collar_receiver.py --out sessions/dryrun
 ```
-(create the `sessions` folder first). At the same time, the SW person records webcam + mic.
+At the same time, the SW person records webcam + mic.
 If anything breaks now, it would have broken with the dog too, so fix it now.
 
 ---
 
 ## 4. The dog session (we only get a few minutes, so make them count)
 
-**Before the dog arrives:** hotspot on, receiver running with `--record sessions/dog1_imu.csv`, webcam recording,
+**Before the dog arrives:** hotspot on, receiver running with `--out sessions/dog1`, webcam recording,
 phone filming from a second angle, LED green, **the power bank is charged**.
 
 **First:** clap once in front of the webcam while pressing button A. That syncs the video with the sensor data.
@@ -242,10 +242,48 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 ## 7. Files in this repo
 
 - `firmware/collar/collar.ino`: the ESP32 code (edit the Wi-Fi + laptop IP at the top)
-- `tools/collar_receiver.py`: live readout + CSV recording + LED control from the laptop
+- `tools/collar_receiver.py`: live readout + saves everything to files + LED control from the laptop
 - `PLAN.md`: the overall 3-hour plan (hardware + software + deck)
 
-**Data format** (one line per sample, 50 per second):
-`seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, loud`
-(`mic` = sound level at the collar over the last 20 ms; `loud` = 1 when it's well above background)
-The recorded CSV also adds `t_laptop` (Unix time) as the first column, used to sync with the video.
+## 8. For the software track: reading the collar data
+
+The receiver always saves to a session folder: `sessions/<date_time>/` by default, or the folder given with
+`--out sessions/dog1`. **`sessions/current.txt`** holds the path of the folder being written right now.
+All files are written live, so they're safe to read while the receiver runs.
+
+| File | What's in it | Use it for |
+|---|---|---|
+| `imu.csv` | Every sample, 50 per second | Activity classification (sliding 2 s windows), replaying a session |
+| `events.jsonl` | One JSON object per line: `marker` (button A), `loud`, `collar_connected`, `collar_lost` | Timeline events, ground-truth labels, rules ("collar data lost") |
+| `live.json` | Latest sample + `mag`, `pitch`, `roll`, `rate_hz`, `collar_ip`, rewritten 10× per second | Dashboard gauges, a quick "is it alive" check |
+
+**`imu.csv` columns:**
+`t_laptop, seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, loud`
+- `t_laptop` = Unix time on the laptop. Use it to sync with the webcam/mic recordings.
+- `mic` = sound level at the collar over the last 20 ms; `loud` = 1 when it's well above background.
+- This sensor reads ~1.2 g at rest (instead of 1.0). Calibrate on the first ~10 s of standing still.
+
+**`events.jsonl` example:**
+```json
+{"t": 1790496054.476, "type": "marker"}
+{"t": 1790496054.882, "type": "loud", "mic": 300}
+```
+
+**Reading it from Python:**
+```python
+import json, pandas as pd
+session = open("sessions/current.txt").read().strip()
+imu = pd.read_csv(f"{session}/imu.csv")                                   # whole session so far
+events = [json.loads(l) for l in open(f"{session}/events.jsonl")]
+live = json.load(open(f"{session}/live.json"))                            # latest reading
+```
+To follow `imu.csv` live, remember how many lines you've read and read only the new ones on each pass
+(or `tail -f` it).
+
+**Setting the collar LED from your code** (e.g. when a rule fires): send a UDP packet to the collar.
+```python
+import json, socket
+live = json.load(open(f"{session}/live.json"))
+socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b"ALERT", (live["collar_ip"], live["cmd_port"]))
+# b"CALM" = green, b"ATTN" = amber, b"ALERT" = red, b"OFF", or b"LED 255 0 128"
+```

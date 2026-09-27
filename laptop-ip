@@ -1,1 +1,4 @@
-172.22.64.1
+const char* WIFI_SSID = "Devesh S24";
+const char* WIFI_PASS = "password123";
+const char* LAPTOP_IP = "172.22.64.1";   // from Step 0
+
