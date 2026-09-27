@@ -1,0 +1,47 @@
+we are working on a prototype for claude build day. here is our rough idea for problem statement:
+"""
+
+Pet owners often cannot continuously understand or monitor their dog's behavior when they are away. Existing pet-monitoring systems can detect individual activities such as barking, sitting, walking, or movement, but *simple classification and static rule-based alerts provide limited understanding of the context, sequence, and meaning of these behaviors*. A single behavior may have different interpretations depending on the dog's recent activity, location, duration, audio signals, and historical patterns.
+
+This project proposes an *AI-based Dog Behavior Recognition and Communication System* that combines computer vision, audio analysis, behavioral classification, contextual reasoning, and a Large Language Model (LLM). The system will use a camera and microphone to detect observable behaviors such as *walking, trotting, galloping, sitting, standing, lying on the chest, and sniffing*, along with sounds such as barking or whining. These observations will be converted into structured behavioral events and analyzed over time.
+
+Rather than allowing the LLM to directly control safety-critical decisions, *traditional rules will handle deterministic alerts, while the LLM will operate as an interpretation and communication layer. It will use the detected events, temporal context, and behavioral history to generate **uncertainty-aware explanations, summaries, and possible interpretations* in natural language.
+
+The goal is therefore not to claim that the system can literally translate a dog's thoughts, but to develop a system that can *transform low-level sensor and ML classifications into meaningful, contextual information that is easier for a human pet owner to understand and act upon*.
+
+### Core problem in one line
+
+> *How can observable dog behaviors detected through AI and sensor data be combined with contextual reasoning to provide more meaningful and natural communication to pet owners than isolated ML classifications or static rule-based alerts?* """
+
+We will do the SW track separately. Lets discuss about Hardware, which is ideally to be tested on real dogs
+
+The hw that I have:
+
+1. breadboard
+2. M-M M-F F-F jumper cables
+3. 1 RGB LED
+4. MPU6050 - gyro/accelerometer
+5. 1 toggle switch
+6. 2 push buttons
+7. Condenser Microphone with two 2.2k resistors
+8. 1 16 x 2 lcd display
+9. 1 ESP32 Microcontroller https://learn.pcbcupid.com/documentation/modules/glyph/glyph-esp32c6/overview-glyph-c6
+
+mcp server for the hw spec: https://learn.pcbcupid.com/mcp
+
+10. a laptop with webcam and 3050 gpu
+
+the judging will be based on: "New Capability (25%) — does it use something the new model can do that the previous one couldn't?
+It Works (25%) — did it run live and do what you said it does?
+Keep or Share (25%) — would you use it next week, or send it to a friend?
+Clarity of Demo (25%) — is the problem and what the model did obvious within two minutes?
+"
+
+btw you are opus 5.5.
+
+For the first round we have to make a 1 minute demo video and a slide deck. 
+The prototype can be small, but the deck should contain the bigger goal.
+
+and if selected, second round we will have 90 second pitch.
+
+we have 3 hours for building something. what is the best we can do? 
