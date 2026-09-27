@@ -225,7 +225,9 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 | Purple LED | Motion sensor wire came loose. Re-tape |
 | `mic` always 0 | `USE_MIC` is false, or the mic wire isn't on IO2 |
 | `mic` jumps around with no sound | Mic wire loose, or mic + and − swapped |
-| LED colours inverted | Set `LED_COMMON_ANODE = true` |
+| LED colours inverted, or **bright white** when it should be green | Common-anode LED (long leg on 3.3V): `LED_COMMON_ANODE = true` (the default now). If your long leg is on GND, set it to `false` |
+| Rate ~24 Hz, "no data for 1 s" every other line, `mic` stuck at 0 | The Wi-Fi is too busy for the collar to keep up. Make sure the latest firmware is uploaded (it sends 5 samples per packet). If it still happens, switch to the **laptop's Mobile hotspot** (set to 2.4 GHz) instead of the venue Wi-Fi |
+| Collar stops when unplugged from the laptop | Power bank turned itself off (too little current). Use a different power bank, or one with a "low current / always on" mode |
 
 ---
 

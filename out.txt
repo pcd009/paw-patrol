@@ -1,9 +1,0 @@
-Listening on UDP 4210. Saving to /home/devesh/paw-patrol/sessions/20260927_080053
-Waiting for collar...
-Collar connected from 127.0.0.1
-  1.1 Hz | |a|=1.19 g  pitch=  -0.5  roll=   1.0 | gyro=(1.0,2.0,3.0) | mic=   5                      | A=0 B=0 | dropped=0
-*** EVENT MARKER at 08:00:54 ***
- 49.2 Hz | |a|=1.19 g  pitch=  -0.5  roll=   1.0 | gyro=(1.0,2.0,3.0) | mic=   5                      | A=0 B=0 | dropped=0
-🔊 LOUD at collar 08:00:54 (mic=300)
- 49.2 Hz | |a|=1.19 g  pitch=  -0.5  roll=   1.0 | gyro=(1.0,2.0,3.0) | mic=   5                      | A=0 B=0 | dropped=0
-  (no data for 1 s - is the collar on and LAPTOP_IP correct?)

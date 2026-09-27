@@ -1,5 +1,5 @@
 // PawPatrol collar firmware: Glyph ESP32-C6 + MPU6050 + electret mic (+ RGB LED, buttons)
-// Streams one CSV line per sample over Wi-Fi UDP at 50 Hz:
+// Samples at 50 Hz and streams CSV lines over Wi-Fi UDP, BATCH lines per packet (one line per sample):
 //   seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,loud
 //   accel in g, gyro in deg/s, mic = peak-to-peak ADC counts over the last 20 ms (0 if unused),
 //   buttons 1 = pressed, loud = 1 if the mic is well above its background level (onboard LED flashes)
@@ -13,7 +13,7 @@
 const char* WIFI_SSID = "YOUR_HOTSPOT_NAME";   // 2.4 GHz only
 const char* WIFI_PASS = "YOUR_HOTSPOT_PASSWORD";
 const char* LAPTOP_IP = "192.168.0.100";       // laptop IP on the same hotspot
-const bool  LED_COMMON_ANODE = false;          // true if the LED's long leg goes to 3.3V
+const bool  LED_COMMON_ANODE = true;           // our LED: long leg to 3.3V. false if long leg goes to GND
 const bool  USE_MIC = true;                    // false if the mic is not wired
 // --------------------------------
 
@@ -35,6 +35,7 @@ const uint8_t MPU_ADDR = 0x68;           // 0x69 if AD0 is tied high
 const float ACCEL_LSB_PER_G   = 4096.0;  // +-8 g range
 const float GYRO_LSB_PER_DPS  = 32.8;    // +-1000 deg/s range
 const uint32_t SAMPLE_US = 20000;        // 50 Hz
+const int BATCH = 5;                     // samples per UDP packet (10 packets/s): copes with busy Wi-Fi
 const int LED_MAX = 80;                  // cap brightness (protects LED if no resistors)
 const float LOUD_FACTOR = 3.0;           // loud = mic above 3x background...
 const int   LOUD_MIN_COUNTS = 40;        // ...and at least this many ADC counts above it
@@ -45,6 +46,8 @@ IPAddress laptop;
 uint32_t seq = 0;
 uint32_t nextSampleUs = 0;
 bool mpuOk = false;
+char batchBuf[BATCH * 128];
+int batchLen = 0, batchCount = 0;
 int micLo = 4095, micHi = 0;   // min/max since the last packet
 float micFloor = -1;           // slowly-adapting background level
 uint32_t loudUntilMs = 0;
@@ -173,6 +176,7 @@ void loop() {
 
   if ((int32_t)(micros() - nextSampleUs) < 0) return;
   nextSampleUs += SAMPLE_US;
+  if ((int32_t)(micros() - nextSampleUs) > 100000) nextSampleUs = micros();  // >100 ms behind: skip ahead, don't burst
 
   float a[3] = {0, 0, 0}, g[3] = {0, 0, 0};
   if (!mpuOk || !mpuRead(a, g)) {
@@ -182,14 +186,19 @@ void loop() {
 
   bool loud;
   int mic = micTakeLevel(loud);
-  char line[160];
+  char line[128];
   int len = snprintf(line, sizeof(line), "%lu,%lu,%.3f,%.3f,%.3f,%.1f,%.1f,%.1f,%d,%d,%d,%d\n",
                      (unsigned long)seq++, (unsigned long)millis(),
                      a[0], a[1], a[2], g[0], g[1], g[2], mic,
                      !digitalRead(BTN_A_PIN), !digitalRead(BTN_B_PIN), loud);
-  udp.beginPacket(laptop, DATA_PORT);
-  udp.write((const uint8_t*)line, len);
-  udp.endPacket();
+  memcpy(batchBuf + batchLen, line, len);
+  batchLen += len;
+  if (++batchCount >= BATCH) {
+    udp.beginPacket(laptop, DATA_PORT);
+    udp.write((const uint8_t*)batchBuf, batchLen);
+    udp.endPacket();
+    batchLen = batchCount = 0;
+  }
 
   if (seq % 50 == 0) Serial.print(line);  // one line per second on USB serial for debugging
 }
