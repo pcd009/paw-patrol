@@ -261,7 +261,13 @@ All files are written live, so they're safe to read while the receiver runs.
 
 **`imu.csv` columns:**
 `t_laptop, seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, loud`
-- `t_laptop` = Unix time on the laptop. Use it to sync with the webcam/mic recordings.
+- `t_laptop` = Unix time on the laptop (seconds, ms precision). **This is the sync key:** record the webcam/mic with
+  laptop timestamps too (`time.time()` in Python) and join on it.
+- `ms` = the collar's own clock (ms since boot). Evenly spaced every 20 ms; use it for exact gaps between samples.
+- `events.jsonl` and `live.json` also carry `time`, the same laptop time in readable form (`2026-09-27 13:48:13.133`),
+  and every console line starts with `[HH:MM:SS.mmm]`.
+- **Sync check at the start of every session:** clap once in front of the webcam while pressing button A.
+  The `marker` event's `t` and the clap in the video/audio should line up; if not, shift by the difference.
 - `mic` = sound level at the collar over the last 20 ms; `loud` = 1 when it's well above background.
 - This sensor reads ~1.2 g at rest (instead of 1.0). Calibrate on the first ~10 s of standing still.
 

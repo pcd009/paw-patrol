@@ -27,6 +27,16 @@ FIELDS = "seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,loud".split(",")
 SESSIONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sessions")
 
 
+def stamp(t=None):
+    """Readable laptop time with milliseconds, e.g. 2026-09-27 13:48:13.133"""
+    t = time.time() if t is None else t
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t)) + f".{int(t % 1 * 1000):03d}"
+
+
+def log(msg, t=None):
+    print(f"[{stamp(t)[11:]}] {msg}")  # console lines start with HH:MM:SS.mmm
+
+
 def write_json_atomic(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -51,7 +61,8 @@ class Receiver:
         self.led = None  # last LED state the collar reported (CALM / ATTN / ALERT / ...)
 
     def log_event(self, kind, t=None, **extra):
-        self.events.write(json.dumps({"t": round(t or time.time(), 3), "type": kind, **extra}) + "\n")
+        t = t or time.time()
+        self.events.write(json.dumps({"t": round(t, 3), "time": stamp(t), "type": kind, **extra}) + "\n")
 
     def handle_packet(self, data):
         # One packet holds several samples (one CSV line each). Spread their laptop timestamps
@@ -61,7 +72,7 @@ class Receiver:
         for line in lines:
             if line.startswith("LED,"):  # the collar confirms every LED change, whoever triggered it
                 self.led = line[4:]
-                print(f"💡 LED -> {self.led}")
+                log(f"💡 LED -> {self.led}", arrived)
                 self.log_event("led", arrived, state=self.led)
         rows = [line.split(",") for line in lines if not line.startswith("LED,")]
         rows = [r for r in rows if len(r) == len(FIELDS)]
@@ -81,13 +92,13 @@ class Receiver:
         self.imu.write(f"{now:.3f}," + ",".join(parts) + "\n")
 
         if int(s["btnA"]) and not self.btn_prev:
-            print(f"*** EVENT MARKER at {time.strftime('%H:%M:%S')} ***")
+            log("*** EVENT MARKER ***", now)
             self.log_event("marker", now)
         self.btn_prev = int(s["btnA"])
 
         # Loud sound at the collar = very likely the dog itself (bark/whine), not the TV
         if int(s["loud"]) and now - self.last_loud > 1.0:
-            print(f"🔊 LOUD at collar {time.strftime('%H:%M:%S')} (mic={s['mic']})")
+            log(f"🔊 LOUD at collar (mic={s['mic']})", now)
             self.log_event("loud", now, mic=int(s["mic"]))
             self.last_loud = now
 
@@ -99,7 +110,7 @@ class Receiver:
         wall = time.time()
         if wall - self.last_live >= 0.1:
             write_json_atomic(self.live_path, {
-                "t_laptop": round(now, 3), "seq": seq,
+                "t_laptop": round(now, 3), "time": stamp(now), "collar_ms": int(s["ms"]), "seq": seq,
                 "ax": ax, "ay": ay, "az": az,
                 "gx": float(s["gx"]), "gy": float(s["gy"]), "gz": float(s["gz"]),
                 "mag": round(mag, 3), "pitch": round(pitch, 1), "roll": round(roll, 1),
@@ -112,9 +123,9 @@ class Receiver:
 
         if wall - self.last_print >= 0.5:
             self.rate = self.count / (wall - self.last_print)
-            print(f"{self.rate:5.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
-                  f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} {'#' * min(int(s['mic']) // 20, 20):<20} | "
-                  f"A={s['btnA']} B={s['btnB']} | dropped={self.dropped}")
+            log(f"collar {int(s['ms']) / 1000:8.2f}s | {self.rate:4.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
+                f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} {'#' * min(int(s['mic']) // 20, 20):<20} | "
+                f"A={s['btnA']} B={s['btnB']} | dropped={self.dropped}", now)
             self.count, self.last_print = 0, wall
 
 
@@ -134,8 +145,8 @@ def main():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)  # big buffer: no loss if we stall briefly
     sock.bind(("0.0.0.0", DATA_PORT))
     sock.settimeout(1.0)
-    print(f"Listening on UDP {DATA_PORT}. Saving to {out_dir}")
-    print("Waiting for collar...")
+    log(f"Listening on UDP {DATA_PORT}. Saving to {out_dir}")
+    log("Waiting for collar...")
 
     def command_loop():
         while True:
@@ -145,7 +156,7 @@ def main():
                 return
             if cmd and rx.collar_ip:
                 sock.sendto(cmd.upper().encode(), (rx.collar_ip, CMD_PORT))
-                print(f"-> sent {cmd.upper()} to {rx.collar_ip}")
+                log(f"-> sent {cmd.upper()} to {rx.collar_ip}")
 
     threading.Thread(target=command_loop, daemon=True).start()
 
@@ -154,13 +165,13 @@ def main():
         try:
             data, addr = sock.recvfrom(4096)
         except socket.timeout:
-            print("  (no data for 1 s - is the collar on and LAPTOP_IP correct?)")
+            log("(no data for 1 s - is the collar on and LAPTOP_IP correct?)")
             if connected:
                 rx.log_event("collar_lost")
                 connected = False
             continue
         if not connected:
-            print(f"Collar {'connected' if rx.collar_ip is None else 'data resumed'} from {addr[0]}")
+            log(f"Collar {'connected' if rx.collar_ip is None else 'data resumed'} from {addr[0]}")
             rx.log_event("collar_connected", ip=addr[0])
             rx.collar_ip = addr[0]
             connected = True
