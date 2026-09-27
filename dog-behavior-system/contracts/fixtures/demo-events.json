@@ -1,0 +1,180 @@
+[
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_001",
+    "subject_id": "demo_dog_01",
+    "source": "video",
+    "label": "lying_on_chest",
+    "confidence": 0.91,
+    "started_at": "2026-09-26T10:00:00.000Z",
+    "ended_at": "2026-09-26T10:00:08.000Z",
+    "zone": "bed_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 0,
+      "clip_end_ms": 8000,
+      "frame_start": 0,
+      "frame_end": 240,
+      "detector": "yolov8n+heuristics"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_002",
+    "subject_id": "demo_dog_01",
+    "source": "video",
+    "label": "standing",
+    "confidence": 0.85,
+    "started_at": "2026-09-26T10:00:08.000Z",
+    "ended_at": "2026-09-26T10:00:10.000Z",
+    "zone": "bed_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 8000,
+      "clip_end_ms": 10000,
+      "frame_start": 240,
+      "frame_end": 300,
+      "detector": "yolov8n+heuristics"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_003",
+    "subject_id": "demo_dog_01",
+    "source": "video",
+    "label": "walking",
+    "confidence": 0.78,
+    "started_at": "2026-09-26T10:00:10.000Z",
+    "ended_at": "2026-09-26T10:00:14.000Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 10000,
+      "clip_end_ms": 14000,
+      "frame_start": 300,
+      "frame_end": 420,
+      "detector": "yolov8n+heuristics"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_004",
+    "subject_id": "demo_dog_01",
+    "source": "video",
+    "label": "sniffing",
+    "confidence": 0.82,
+    "started_at": "2026-09-26T10:00:14.000Z",
+    "ended_at": "2026-09-26T10:00:20.200Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 14000,
+      "clip_end_ms": 20200,
+      "frame_start": 420,
+      "frame_end": 606,
+      "detector": "yolov8n+heuristics"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_005",
+    "subject_id": "demo_dog_01",
+    "source": "audio",
+    "label": "whining",
+    "confidence": 0.67,
+    "started_at": "2026-09-26T10:00:20.500Z",
+    "ended_at": "2026-09-26T10:00:23.500Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 20500,
+      "clip_end_ms": 23500,
+      "detector": "yamnet"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_006",
+    "subject_id": "demo_dog_01",
+    "source": "audio",
+    "label": "barking",
+    "confidence": 0.93,
+    "started_at": "2026-09-26T10:00:30.000Z",
+    "ended_at": "2026-09-26T10:00:30.800Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 30000,
+      "clip_end_ms": 30800,
+      "detector": "yamnet"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_007",
+    "subject_id": "demo_dog_01",
+    "source": "audio",
+    "label": "barking",
+    "confidence": 0.9,
+    "started_at": "2026-09-26T10:00:38.000Z",
+    "ended_at": "2026-09-26T10:00:38.900Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 38000,
+      "clip_end_ms": 38900,
+      "detector": "yamnet"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_008",
+    "subject_id": "demo_dog_01",
+    "source": "audio",
+    "label": "barking",
+    "confidence": 0.88,
+    "started_at": "2026-09-26T10:00:45.000Z",
+    "ended_at": "2026-09-26T10:00:45.700Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 45000,
+      "clip_end_ms": 45700,
+      "detector": "yamnet"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_009",
+    "subject_id": "demo_dog_01",
+    "source": "video",
+    "label": "sitting",
+    "confidence": 0.8,
+    "started_at": "2026-09-26T10:00:46.000Z",
+    "ended_at": "2026-09-26T10:00:58.000Z",
+    "zone": "door_area",
+    "evidence": {
+      "clip_id": "demo_clip_01",
+      "clip_start_ms": 46000,
+      "clip_end_ms": 58000,
+      "frame_start": 1380,
+      "frame_end": 1740,
+      "detector": "yolov8n+heuristics"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "evt_010",
+    "subject_id": "demo_dog_01",
+    "source": "sensor",
+    "label": "button_press",
+    "confidence": 1.0,
+    "started_at": "2026-09-26T10:00:50.000Z",
+    "ended_at": "2026-09-26T10:00:50.000Z",
+    "zone": "door_area",
+    "evidence": {
+      "device_id": "esp32_door_button",
+      "detector": "esp32_button"
+    }
+  }
+]

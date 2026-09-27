@@ -1,0 +1,21 @@
+# Hackathon prototype dependencies. Pinned loosely; python3.11 in .venv.
+numpy
+pandas
+scikit-learn
+joblib
+jsonschema
+referencing
+fastapi
+uvicorn[standard]
+python-multipart
+pyyaml
+requests
+anthropic
+opencv-python
+ultralytics
+sounddevice
+soundfile
+librosa
+transformers
+torch
+torchaudio

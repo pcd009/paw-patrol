@@ -1,0 +1,109 @@
+"""Swappable output adapters. The orchestrator computes device state (led/buzzer) from active
+alerts ONLY (see app/orchestrator/server.py::compute_device_state) and pushes it to every
+configured sink. Tomorrow's ESP32 LED/buzzer mirror just polls GET /api/device, which is served
+in plain text (`led=amber buzzer=0`) so the device needs no JSON library -- see DeviceStateSink.
+"""
+from __future__ import annotations
+
+import json
+from typing import Optional
+
+
+class OutputSink:
+    def update_device(self, led: str, buzzer: bool) -> None:
+        raise NotImplementedError
+
+    def notify(self, kind: str, payload: dict) -> None:
+        """Optional: fired on new events/alerts/triage. Default: no-op."""
+        pass
+
+
+class ConsoleSink(OutputSink):
+    def update_device(self, led: str, buzzer: bool) -> None:
+        print(f"[device] led={led} buzzer={'1' if buzzer else '0'}")
+
+    def notify(self, kind: str, payload: dict) -> None:
+        print(f"[{kind}] {json.dumps(payload)[:300]}")
+
+
+class DeviceStateSink(OutputSink):
+    """The canonical source of truth for GET /api/device. Holds state in memory; the FastAPI
+    route formats it as plain text. This is what a real ESP32 LED/buzzer mirror would poll."""
+
+    def __init__(self):
+        self.led = "green"
+        self.buzzer = False
+
+    def update_device(self, led: str, buzzer: bool) -> None:
+        self.led = led
+        self.buzzer = buzzer
+
+    def as_plain_text(self) -> str:
+        return f"led={self.led} buzzer={1 if self.buzzer else 0}"
+
+
+class SerialSink(OutputSink):
+    """Stub: write device state to a USB-serial ESP32 instead of (or in addition to) it polling
+    HTTP. Needs `pip install pyserial`. Kept minimal: one line per update, e.g. "red 1\\n"."""
+
+    def __init__(self, port: str, baud: int = 115200):
+        self.port = port
+        self.baud = baud
+        self._ser = None
+
+    def _ensure_open(self):
+        if self._ser is None:
+            import serial  # type: ignore
+            self._ser = serial.Serial(self.port, self.baud, timeout=1)
+        return self._ser
+
+    def update_device(self, led: str, buzzer: bool) -> None:
+        try:
+            ser = self._ensure_open()
+            ser.write(f"{led} {1 if buzzer else 0}\n".encode())
+        except Exception as e:
+            print(f"[SerialSink] write failed (hardware not connected?): {e}")
+
+
+class WebhookSink(OutputSink):
+    """Stub: POST device/alert updates to an arbitrary URL (e.g. a Slack webhook or a second
+    service). Failures are swallowed -- this must never take the demo down."""
+
+    def __init__(self, url: str, timeout_s: float = 2.0):
+        self.url = url
+        self.timeout_s = timeout_s
+
+    def update_device(self, led: str, buzzer: bool) -> None:
+        self._post({"type": "device", "led": led, "buzzer": buzzer})
+
+    def notify(self, kind: str, payload: dict) -> None:
+        self._post({"type": kind, **payload})
+
+    def _post(self, body: dict) -> None:
+        try:
+            import requests
+            requests.post(self.url, json=body, timeout=self.timeout_s)
+        except Exception as e:
+            print(f"[WebhookSink] post failed: {e}")
+
+
+def build_sinks(names, serial_port: Optional[str] = None, webhook_url: Optional[str] = None):
+    """config.yaml adapters.output_sinks -> list[OutputSink]. Returns (sinks, device_state_sink)
+    so the orchestrator can also read .led/.buzzer/.as_plain_text() directly for GET /api/device."""
+    sinks = []
+    device_sink: Optional[DeviceStateSink] = None
+    for name in names:
+        if name == "console":
+            sinks.append(ConsoleSink())
+        elif name == "device_state":
+            device_sink = DeviceStateSink()
+            sinks.append(device_sink)
+        elif name == "serial" and serial_port:
+            sinks.append(SerialSink(serial_port))
+        elif name == "webhook" and webhook_url:
+            sinks.append(WebhookSink(webhook_url))
+    if device_sink is None:
+        # /api/device must always have something to read from.
+        device_sink = DeviceStateSink()
+        sinks.append(device_sink)
+    return sinks, device_sink

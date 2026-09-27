@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "demo_state.json",
+  "title": "DemoState",
+  "description": "The single object the dashboard renders (GET /api/state).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "subject_id", "mode", "events", "alerts", "context_packets", "triage_results", "device"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "subject_id": { "type": "string" },
+    "mode": { "enum": ["replay", "live"] },
+    "events": { "type": "array", "items": { "$ref": "behavior_event.json" } },
+    "alerts": { "type": "array", "items": { "$ref": "alert.json" } },
+    "context_packets": { "type": "array", "items": { "$ref": "context_packet.json" } },
+    "triage_results": { "type": "array", "items": { "$ref": "triage_result.json" } },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["led", "buzzer"],
+      "description": "Derived ONLY from active alerts. ESP32 reads this.",
+      "properties": {
+        "led": { "enum": ["green", "amber", "red"] },
+        "buzzer": { "type": "boolean" }
+      }
+    }
+  }
+}

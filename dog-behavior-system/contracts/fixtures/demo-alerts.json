@@ -1,0 +1,32 @@
+[
+  {
+    "schema_version": "1.0",
+    "alert_id": "alert_605722acebf8",
+    "subject_id": "demo_dog_01",
+    "rule_id": "repeated_barking_window",
+    "severity": "warning",
+    "status": "active",
+    "triggered_at": "2026-09-26T16:25:46.128Z",
+    "evidence_event_ids": [
+      "evt_006",
+      "evt_007",
+      "evt_008"
+    ],
+    "reason_code": "three_bark_events_within_60_seconds",
+    "message": "Repeated barking: 3+ bark events within 60 seconds."
+  },
+  {
+    "schema_version": "1.0",
+    "alert_id": "alert_c97c17f6e715",
+    "subject_id": "demo_dog_01",
+    "rule_id": "dog_button_request",
+    "severity": "info",
+    "status": "active",
+    "triggered_at": "2026-09-26T16:25:46.272Z",
+    "evidence_event_ids": [
+      "evt_010"
+    ],
+    "reason_code": "dog_pressed_request_button",
+    "message": "Your dog pressed the door button."
+  }
+]

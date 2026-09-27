@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dog Behaviour Monitor</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --panel-2: #1d2740;
+    --border: #2a3552;
+    --text: #eef1f8;
+    --muted: #93a0c2;
+    --green: #33d17a;
+    --amber: #f5a623;
+    --red: #ef4444;
+    --blue: #4c8dff;
+    --info: #5aa9e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 14px 24px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 20px; margin: 0; flex: 0 0 auto; }
+  .spacer { flex: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+  .led-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px 2px currentColor; }
+  .led-green { background: var(--green); color: var(--green); }
+  .led-amber { background: var(--amber); color: var(--amber); }
+  .led-red { background: var(--red); color: var(--red); }
+  .buzzer-on { color: var(--red); font-weight: 700; }
+  button, select {
+    background: var(--blue); color: white; border: none; border-radius: 8px;
+    padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  main {
+    display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; padding: 16px 24px;
+    max-width: 1500px; margin: 0 auto;
+  }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  }
+  .panel h2 { margin: 0 0 10px 0; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  #frame { width: 100%; border-radius: 8px; background: #000; display: block; aspect-ratio: 16/9; object-fit: contain; }
+  .assessment-decision { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .decision-routine { color: var(--green); }
+  .decision-monitor { color: var(--amber); }
+  .decision-notify { color: var(--red); }
+  .decision-insufficient_evidence { color: var(--muted); }
+  .assessment-msg { font-size: 17px; margin: 8px 0; line-height: 1.4; }
+  .assessment-meta { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .assessment-meta b { color: var(--text); }
+  .model-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .model-chip.mock { background: #3a3f55; color: var(--muted); }
+  .model-chip.live { background: #234a33; color: var(--green); }
+  .alert-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
+    margin-bottom: 6px; font-size: 14px; border-left: 4px solid var(--border);
+  }
+  .sev-info { border-left-color: var(--info); background: rgba(90,169,230,0.1); }
+  .sev-warning { border-left-color: var(--amber); background: rgba(245,166,35,0.12); }
+  .sev-critical { border-left-color: var(--red); background: rgba(239,68,68,0.15); }
+  .alert-sev-label { font-weight: 700; text-transform: uppercase; font-size: 11px; }
+  .empty { color: var(--muted); font-size: 14px; font-style: italic; }
+  #timeline { max-height: 340px; overflow-y: auto; }
+  .evt-row {
+    display: grid; grid-template-columns: 70px 60px 1fr 90px; gap: 8px; align-items: center;
+    padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border);
+  }
+  .evt-row.cited { background: rgba(76,141,255,0.18); border-radius: 6px; }
+  .evt-time { color: var(--muted); }
+  .evt-source { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .evt-zone { color: var(--muted); text-align: right; font-size: 12px; }
+  #ask-log { max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
+  .ask-q { font-weight: 700; margin-top: 10px; }
+  .ask-a { margin: 4px 0 0 0; color: var(--muted); }
+  .ask-row { display: flex; gap: 8px; }
+  .ask-row input {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🐾 Dog Behaviour Monitor</h1>
+  <span class="badge" id="mode-badge">mode: --</span>
+  <span class="badge" id="model-badge">model: --</span>
+  <div class="spacer"></div>
+  <span class="badge"><span class="led-dot led-green" id="led-dot"></span> <span id="led-text">green</span> &nbsp; buzzer: <span id="buzzer-text">off</span></span>
+  <select id="replay-speed">
+    <option value="1">1x (real time)</option>
+    <option value="5">5x</option>
+    <option value="20" selected>20x (fast)</option>
+  </select>
+  <button id="replay-btn">▶ Replay demo</button>
+</header>
+
+<main>
+  <div class="col">
+    <div class="panel">
+      <h2>Live camera</h2>
+      <img id="frame" src="/api/frame.jpg" alt="camera feed">
+    </div>
+    <div class="panel">
+      <h2>Active alerts</h2>
+      <div id="alerts"><div class="empty">No active alerts.</div></div>
+    </div>
+    <div class="panel">
+      <h2>Event timeline</h2>
+      <div id="timeline"><div class="empty">Waiting for events...</div></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>Latest Claude assessment</h2>
+      <div id="assessment"><div class="empty">No assessment yet.</div></div>
+    </div>
+    <div class="panel">
+      <h2>Ask about your dog</h2>
+      <div id="ask-log"></div>
+      <div class="ask-row">
+        <input id="ask-input" type="text" placeholder="e.g. Was my dog anxious this morning?">
+        <button id="ask-btn">Ask</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let citedEventIds = new Set();
+
+function fmtTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], {hour12: false});
+  } catch (e) { return iso; }
+}
+
+function renderDevice(device) {
+  const led = device.led || "green";
+  $("led-dot").className = "led-dot led-" + led;
+  $("led-text").textContent = led;
+  $("buzzer-text").textContent = device.buzzer ? "ON" : "off";
+  $("buzzer-text").className = device.buzzer ? "buzzer-on" : "";
+}
+
+function renderModeBadge(mode) {
+  $("mode-badge").textContent = "mode: " + mode;
+}
+
+function renderAlerts(alerts) {
+  const active = alerts.filter(a => a.status === "active");
+  const el = $("alerts");
+  if (active.length === 0) {
+    el.innerHTML = '<div class="empty">No active alerts.</div>';
+    return;
+  }
+  el.innerHTML = active.slice().reverse().map(a => `
+    <div class="alert-row sev-${a.severity}">
+      <span class="alert-sev-label">${a.severity}</span>
+      <span>${a.message}</span>
+    </div>
+  `).join("");
+}
+
+function renderTimeline(events) {
+  const el = $("timeline");
+  if (events.length === 0) {
+    el.innerHTML = '<div class="empty">Waiting for events...</div>';
+    return;
+  }
+  el.innerHTML = events.slice().reverse().map(e => {
+    const cited = citedEventIds.has(e.event_id) ? "cited" : "";
+    return `
+      <div class="evt-row ${cited}">
+        <span class="evt-time">${fmtTime(e.started_at)}</span>
+        <span class="evt-source">${e.source}</span>
+        <span>${e.label}${cited ? " ⭐" : ""}</span>
+        <span class="evt-zone">${e.zone}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderAssessment(triageResults) {
+  const el = $("assessment");
+  const modelBadge = $("model-badge");
+  if (!triageResults || triageResults.length === 0) {
+    el.innerHTML = '<div class="empty">No assessment yet.</div>';
+    citedEventIds = new Set();
+    modelBadge.textContent = "model: --";
+    modelBadge.className = "badge";
+    return;
+  }
+  const t = triageResults[triageResults.length - 1];
+  citedEventIds = new Set(t.evidence_event_ids || []);
+  const isMock = (t.model || "mock") === "mock";
+  modelBadge.textContent = "model: " + t.model;
+  modelBadge.className = "badge";
+  el.innerHTML = `
+    <div class="assessment-decision decision-${t.decision}">${t.decision.replace("_", " ")}</div>
+    <div class="assessment-msg">${t.owner_message}</div>
+    <div class="assessment-meta">
+      <b>Confidence:</b> ${(t.confidence * 100).toFixed(0)}%
+      &nbsp;<span class="model-chip ${isMock ? "mock" : "live"}">${isMock ? "MOCK" : t.model}</span><br>
+      <b>Uncertainty:</b> ${t.uncertainty}<br>
+      <b>Suggested check:</b> ${t.suggested_check || "--"}<br>
+      <b>Cited events:</b> ${(t.evidence_event_ids || []).join(", ") || "none"}
+      ${(t.referenced_alert_ids || []).length ? "<br><b>Cited alerts:</b> " + t.referenced_alert_ids.join(", ") : ""}
+    </div>
+  `;
+}
+
+async function poll() {
+  try {
+    const res = await fetch("/api/state");
+    const state = await res.json();
+    renderModeBadge(state.mode);
+    renderDevice(state.device);
+    renderAssessment(state.triage_results);
+    renderAlerts(state.alerts);
+    renderTimeline(state.events);
+  } catch (e) {
+    console.error("poll failed", e);
+  }
+  $("frame").src = "/api/frame.jpg?t=" + Date.now();
+}
+
+$("replay-btn").addEventListener("click", async () => {
+  const speed = parseFloat($("replay-speed").value);
+  $("replay-btn").disabled = true;
+  try {
+    await fetch("/api/replay", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({speed}),
+    });
+  } catch (e) { console.error(e); }
+  setTimeout(() => { $("replay-btn").disabled = false; }, 2000);
+});
+
+$("ask-btn").addEventListener("click", async () => {
+  const input = $("ask-input");
+  const question = input.value.trim();
+  if (!question) return;
+  const log = $("ask-log");
+  const qDiv = document.createElement("div");
+  qDiv.className = "ask-q";
+  qDiv.textContent = "Q: " + question;
+  log.appendChild(qDiv);
+  const aDiv = document.createElement("div");
+  aDiv.className = "ask-a";
+  aDiv.textContent = "...";
+  log.appendChild(aDiv);
+  log.scrollTop = log.scrollHeight;
+  input.value = "";
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question}),
+    });
+    const data = await res.json();
+    aDiv.textContent = `A (${data.model}): ${data.answer}`;
+  } catch (e) {
+    aDiv.textContent = "Error asking the assistant.";
+  }
+  log.scrollTop = log.scrollHeight;
+});
+
+$("ask-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("ask-btn").click();
+});
+
+poll();
+setInterval(poll, 1000);
+</script>
+</body>
+</html>

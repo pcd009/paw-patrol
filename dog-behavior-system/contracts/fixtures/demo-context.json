@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "context_id": "ctx_28dc5b0d93d7",
+  "subject_id": "demo_dog_01",
+  "created_at": "2026-09-26T16:25:44.605Z",
+  "window_start": "2026-09-26T16:24:44.605Z",
+  "window_end": "2026-09-26T16:25:44.605Z",
+  "events": [
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_001",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "lying_on_chest",
+      "confidence": 0.91,
+      "started_at": "2026-09-26T16:25:44.605Z",
+      "ended_at": "2026-09-26T16:25:44.872Z",
+      "zone": "bed_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 0,
+        "clip_end_ms": 8000,
+        "frame_start": 0,
+        "frame_end": 240,
+        "detector": "yolov8n+heuristics"
+      }
+    }
+  ],
+  "active_alerts": [],
+  "derived_metrics": {
+    "bark_count": 0,
+    "whine_count": 0,
+    "button_press_count": 0,
+    "label_duration_ms": {
+      "lying_on_chest": 267
+    },
+    "zone_visits": {
+      "bed_area": 1
+    },
+    "last_zone": "bed_area"
+  },
+  "recent_history": {
+    "similar_pattern_seen_today": false,
+    "notes": []
+  }
+}

@@ -1,0 +1,56 @@
+# Central config: which adapters to use, zone geometry, thresholds.
+# Swap any "adapters.*" value to point at real hardware tomorrow -- see README "Hardware plug-in points".
+
+subject_id: demo_dog_01
+
+# Zones as normalized [x0, y0, x1, y1] rects over the camera frame (0..1, origin top-left).
+# The dog's zone = whichever rect contains the bbox-centre; "unknown" if none match.
+# Tune these at the venue by eyeballing the webcam frame.
+zones:
+  door_area: [0.0, 0.0, 0.35, 0.55]
+  bed_area: [0.65, 0.0, 1.0, 0.55]
+  food_area: [0.0, 0.55, 0.35, 1.0]
+  play_area: [0.35, 0.55, 1.0, 1.0]
+
+adapters:
+  # VideoSource: webcam index ("0"), a file path, or an rtsp/http URL (phone IP-cam).
+  video_source: "0"
+  video_fps_sample: 8
+  # AudioSource: "mic" for sounddevice input, or a wav/mp4 file path. null disables audio.
+  audio_source: null
+  # Output sinks to enable, in order. Options: console, device_state, serial, webhook
+  output_sinks: ["console", "device_state"]
+  serial_port: null       # e.g. /dev/tty.usbserial-XXXX for a real ESP32 mirror
+  webhook_url: null
+
+thresholds:
+  gait:
+    # bbox-centre speed in bbox-heights/second
+    stationary_max: 0.6
+    walking_max: 2.2
+    trotting_max: 4.5
+    # above trotting_max => galloping
+  vision_labeler:
+    min_interval_s: 3
+    max_interval_s: 10
+    stationary_speed_max: 0.6   # only call the labeler when gait says "stationary or slow"
+  audio:
+    window_s: 1.0
+    hop_s: 0.5
+    prob_threshold: 0.15
+    bark_ast_labels: ["Bark", "Bow-wow", "Yip", "Dog"]
+    whine_ast_labels: ["Whimper (dog)", "Whimper", "Howl"]
+  segmenter:
+    stable_window_s: 1.0
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+triage:
+  min_interval_s: 15
+  window_s: 60
+
+llm:
+  model_env_var: "CLAUDE_MODEL"
+  default_model: "claude-sonnet-5"

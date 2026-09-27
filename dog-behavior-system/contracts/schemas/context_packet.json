@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "context_packet.json",
+  "title": "ContextPacket",
+  "description": "Everything the LLM is allowed to see for one time window. Self-contained: events and alerts are embedded, not just referenced.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "context_id", "subject_id", "created_at", "window_start", "window_end", "events", "active_alerts", "derived_metrics", "recent_history"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "context_id": { "type": "string", "pattern": "^ctx_[A-Za-z0-9]+$" },
+    "subject_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "window_start": { "type": "string", "format": "date-time" },
+    "window_end": { "type": "string", "format": "date-time" },
+    "events": { "type": "array", "items": { "$ref": "behavior_event.json" } },
+    "active_alerts": { "type": "array", "items": { "$ref": "alert.json" } },
+    "derived_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bark_count", "whine_count", "button_press_count", "label_duration_ms", "zone_visits", "last_zone"],
+      "properties": {
+        "bark_count": { "type": "integer", "minimum": 0 },
+        "whine_count": { "type": "integer", "minimum": 0 },
+        "button_press_count": { "type": "integer", "minimum": 0 },
+        "label_duration_ms": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "zone_visits": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "last_zone": { "type": "string" }
+      }
+    },
+    "recent_history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["similar_pattern_seen_today", "notes"],
+      "properties": {
+        "similar_pattern_seen_today": { "type": "boolean" },
+        "notes": { "type": "array", "items": { "type": "string" }, "description": "Short owner-provided or computed facts, e.g. 'last walk 07:30'" }
+      }
+    }
+  }
+}

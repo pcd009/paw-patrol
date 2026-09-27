@@ -1,0 +1,289 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-26T16:27:43.854Z",
+  "subject_id": "demo_dog_01",
+  "mode": "replay",
+  "events": [
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_001",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "lying_on_chest",
+      "confidence": 0.91,
+      "started_at": "2026-09-26T16:25:44.605Z",
+      "ended_at": "2026-09-26T16:25:44.872Z",
+      "zone": "bed_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 0,
+        "clip_end_ms": 8000,
+        "frame_start": 0,
+        "frame_end": 240,
+        "detector": "yolov8n+heuristics"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_002",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "standing",
+      "confidence": 0.85,
+      "started_at": "2026-09-26T16:25:44.872Z",
+      "ended_at": "2026-09-26T16:25:44.938Z",
+      "zone": "bed_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 8000,
+        "clip_end_ms": 10000,
+        "frame_start": 240,
+        "frame_end": 300,
+        "detector": "yolov8n+heuristics"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_003",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "walking",
+      "confidence": 0.78,
+      "started_at": "2026-09-26T16:25:44.938Z",
+      "ended_at": "2026-09-26T16:25:45.072Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 10000,
+        "clip_end_ms": 14000,
+        "frame_start": 300,
+        "frame_end": 420,
+        "detector": "yolov8n+heuristics"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_004",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "sniffing",
+      "confidence": 0.82,
+      "started_at": "2026-09-26T16:25:45.072Z",
+      "ended_at": "2026-09-26T16:25:45.278Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 14000,
+        "clip_end_ms": 20200,
+        "frame_start": 420,
+        "frame_end": 606,
+        "detector": "yolov8n+heuristics"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_005",
+      "subject_id": "demo_dog_01",
+      "source": "audio",
+      "label": "whining",
+      "confidence": 0.67,
+      "started_at": "2026-09-26T16:25:45.288Z",
+      "ended_at": "2026-09-26T16:25:45.388Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 20500,
+        "clip_end_ms": 23500,
+        "detector": "yamnet"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_006",
+      "subject_id": "demo_dog_01",
+      "source": "audio",
+      "label": "barking",
+      "confidence": 0.93,
+      "started_at": "2026-09-26T16:25:45.605Z",
+      "ended_at": "2026-09-26T16:25:45.632Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 30000,
+        "clip_end_ms": 30800,
+        "detector": "yamnet"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_007",
+      "subject_id": "demo_dog_01",
+      "source": "audio",
+      "label": "barking",
+      "confidence": 0.9,
+      "started_at": "2026-09-26T16:25:45.872Z",
+      "ended_at": "2026-09-26T16:25:45.902Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 38000,
+        "clip_end_ms": 38900,
+        "detector": "yamnet"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_008",
+      "subject_id": "demo_dog_01",
+      "source": "audio",
+      "label": "barking",
+      "confidence": 0.88,
+      "started_at": "2026-09-26T16:25:46.105Z",
+      "ended_at": "2026-09-26T16:25:46.128Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 45000,
+        "clip_end_ms": 45700,
+        "detector": "yamnet"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_009",
+      "subject_id": "demo_dog_01",
+      "source": "video",
+      "label": "sitting",
+      "confidence": 0.8,
+      "started_at": "2026-09-26T16:25:46.138Z",
+      "ended_at": "2026-09-26T16:25:46.538Z",
+      "zone": "door_area",
+      "evidence": {
+        "clip_id": "demo_clip_01",
+        "clip_start_ms": 46000,
+        "clip_end_ms": 58000,
+        "frame_start": 1380,
+        "frame_end": 1740,
+        "detector": "yolov8n+heuristics"
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "event_id": "evt_010",
+      "subject_id": "demo_dog_01",
+      "source": "sensor",
+      "label": "button_press",
+      "confidence": 1.0,
+      "started_at": "2026-09-26T16:25:46.272Z",
+      "ended_at": "2026-09-26T16:25:46.272Z",
+      "zone": "door_area",
+      "evidence": {
+        "device_id": "esp32_door_button",
+        "detector": "esp32_button"
+      }
+    }
+  ],
+  "alerts": [
+    {
+      "schema_version": "1.0",
+      "alert_id": "alert_605722acebf8",
+      "subject_id": "demo_dog_01",
+      "rule_id": "repeated_barking_window",
+      "severity": "warning",
+      "status": "active",
+      "triggered_at": "2026-09-26T16:25:46.128Z",
+      "evidence_event_ids": [
+        "evt_006",
+        "evt_007",
+        "evt_008"
+      ],
+      "reason_code": "three_bark_events_within_60_seconds",
+      "message": "Repeated barking: 3+ bark events within 60 seconds."
+    },
+    {
+      "schema_version": "1.0",
+      "alert_id": "alert_c97c17f6e715",
+      "subject_id": "demo_dog_01",
+      "rule_id": "dog_button_request",
+      "severity": "info",
+      "status": "active",
+      "triggered_at": "2026-09-26T16:25:46.272Z",
+      "evidence_event_ids": [
+        "evt_010"
+      ],
+      "reason_code": "dog_pressed_request_button",
+      "message": "Your dog pressed the door button."
+    }
+  ],
+  "context_packets": [
+    {
+      "schema_version": "1.0",
+      "context_id": "ctx_28dc5b0d93d7",
+      "subject_id": "demo_dog_01",
+      "created_at": "2026-09-26T16:25:44.605Z",
+      "window_start": "2026-09-26T16:24:44.605Z",
+      "window_end": "2026-09-26T16:25:44.605Z",
+      "events": [
+        {
+          "schema_version": "1.0",
+          "event_id": "evt_001",
+          "subject_id": "demo_dog_01",
+          "source": "video",
+          "label": "lying_on_chest",
+          "confidence": 0.91,
+          "started_at": "2026-09-26T16:25:44.605Z",
+          "ended_at": "2026-09-26T16:25:44.872Z",
+          "zone": "bed_area",
+          "evidence": {
+            "clip_id": "demo_clip_01",
+            "clip_start_ms": 0,
+            "clip_end_ms": 8000,
+            "frame_start": 0,
+            "frame_end": 240,
+            "detector": "yolov8n+heuristics"
+          }
+        }
+      ],
+      "active_alerts": [],
+      "derived_metrics": {
+        "bark_count": 0,
+        "whine_count": 0,
+        "button_press_count": 0,
+        "label_duration_ms": {
+          "lying_on_chest": 267
+        },
+        "zone_visits": {
+          "bed_area": 1
+        },
+        "last_zone": "bed_area"
+      },
+      "recent_history": {
+        "similar_pattern_seen_today": false,
+        "notes": []
+      }
+    }
+  ],
+  "triage_results": [
+    {
+      "schema_version": "1.0",
+      "triage_id": "triage_449d7a27832b",
+      "context_id": "ctx_28dc5b0d93d7",
+      "subject_id": "demo_dog_01",
+      "created_at": "2026-09-26T16:25:44.606Z",
+      "model": "mock",
+      "decision": "routine",
+      "confidence": 0.5,
+      "evidence_event_ids": [
+        "evt_001"
+      ],
+      "referenced_alert_ids": [],
+      "owner_message": "Nothing notable in the last minute.",
+      "uncertainty": "Mock triage (no ANTHROPIC_API_KEY set): a fixed rule-of-thumb summary of the active alerts and recent events, not a model read of the context.",
+      "suggested_check": "Look in on your dog if you're nearby."
+    }
+  ],
+  "device": {
+    "led": "amber",
+    "buzzer": false
+  }
+}

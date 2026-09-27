@@ -1,0 +1,118 @@
+"""Live/webcam detector runner: video (+ optional audio) -> BehaviorEvents -> POST to the
+orchestrator. Every event is validated against contracts/schemas/behavior_event.json before it
+is sent. Also POSTs the latest annotated JPEG frame for the dashboard.
+
+    python -m services.detection.run --video 0 --server http://localhost:8000
+    python -m services.detection.run --video 0 --audio mic --server http://localhost:8000
+    python -m services.detection.run --video data/demo_videos/clip1.mp4 --audio data/demo_videos/clip1.mp4 --server http://localhost:8000
+"""
+from __future__ import annotations
+
+import argparse
+import threading
+import time
+from datetime import datetime, timezone
+
+import requests
+
+from app.config import get as cfg_get
+from app.io.inputs import AudioSource, VideoSource
+from contracts.validate import validate
+from services.detection.audio_detector import AudioDetector, merge_events as merge_audio_events
+from services.detection.segmenter import Segmenter
+from services.detection.video_detector import VideoDetector
+
+
+class SharedZone:
+    def __init__(self):
+        self.zone = "unknown"
+
+
+def post_event(server: str, event: dict) -> None:
+    try:
+        validate(event, "behavior_event")
+    except ValueError as e:
+        print(f"[run] SKIP invalid event: {e}")
+        return
+    try:
+        requests.post(f"{server}/api/events", json=event, timeout=3)
+        print(f"[run] -> {event['source']:>5} {event['label']:<15} {event['zone']}")
+    except Exception as e:
+        print(f"[run] POST /api/events failed: {e}")
+
+
+def run_video(video_src: str, server: str, subject_id: str, shared_zone: SharedZone) -> None:
+    vs = VideoSource(video_src, target_fps=cfg_get("adapters", "video_fps_sample", default=8))
+    detector = VideoDetector(vs)
+    t0_wall = datetime.now(timezone.utc)
+    stable_s = cfg_get("thresholds", "segmenter", "stable_window_s", default=1.0)
+    seg = Segmenter(subject_id, "video", t0_wall, stable_window_s=stable_s)
+    last_frame_post = 0.0
+    try:
+        for sample in detector.samples():
+            if sample.get("zone") and sample["zone"] != "unknown":
+                shared_zone.zone = sample["zone"]
+            ev = seg.push(sample)
+            if ev:
+                post_event(server, ev)
+            now = time.monotonic()
+            if detector.last_annotated_jpeg and now - last_frame_post > 0.5:
+                last_frame_post = now
+                try:
+                    requests.post(f"{server}/api/frame", data=detector.last_annotated_jpeg,
+                                  headers={"Content-Type": "image/jpeg"}, timeout=2)
+                except Exception as e:
+                    print(f"[run] POST /api/frame failed: {e}")
+    finally:
+        ev = seg.flush()
+        if ev:
+            post_event(server, ev)
+
+
+def run_audio(audio_src: str, server: str, subject_id: str, shared_zone: SharedZone) -> None:
+    src = AudioSource(audio_src)
+    det = AudioDetector(
+        src,
+        window_s=cfg_get("thresholds", "audio", "window_s", default=1.0),
+        hop_s=cfg_get("thresholds", "audio", "hop_s", default=0.5),
+        threshold=cfg_get("thresholds", "audio", "prob_threshold", default=0.15),
+    )
+    t0_wall = datetime.now(timezone.utc)
+    for ev in merge_audio_events(det.windows(), subject_id, t0_wall, zone_getter=lambda: shared_zone.zone):
+        post_event(server, ev)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--video", default=None, help="webcam index, file path, or rtsp/http URL")
+    ap.add_argument("--audio", default=None, help='"mic", or a wav/mp4 file path')
+    ap.add_argument("--server", default="http://localhost:8000")
+    ap.add_argument("--subject-id", default=None)
+    args = ap.parse_args()
+
+    subject_id = args.subject_id or cfg_get("subject_id", default="demo_dog_01")
+    shared_zone = SharedZone()
+
+    threads = []
+    if args.video is not None:
+        threads.append(threading.Thread(
+            target=run_video, args=(args.video, args.server, subject_id, shared_zone), daemon=True))
+    if args.audio is not None:
+        threads.append(threading.Thread(
+            target=run_audio, args=(args.audio, args.server, subject_id, shared_zone), daemon=True))
+
+    if not threads:
+        print("[run] nothing to do -- pass --video and/or --audio")
+        return
+
+    for th in threads:
+        th.start()
+    try:
+        for th in threads:
+            th.join()
+    except KeyboardInterrupt:
+        print("\n[run] stopping")
+
+
+if __name__ == "__main__":
+    main()

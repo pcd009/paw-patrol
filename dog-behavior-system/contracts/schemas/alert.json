@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "alert.json",
+  "title": "Alert",
+  "description": "Deterministic rule output. Only the rule engine creates alerts, and only the rule engine may use severity 'critical'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "alert_id", "subject_id", "rule_id", "severity", "status", "triggered_at", "evidence_event_ids", "reason_code", "message"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "alert_id": { "type": "string", "pattern": "^alert_[A-Za-z0-9]+$" },
+    "subject_id": { "type": "string" },
+    "rule_id": {
+      "enum": ["repeated_barking_window", "sustained_whining", "prolonged_distress", "dog_button_request"]
+    },
+    "severity": { "enum": ["info", "warning", "critical"] },
+    "status": { "enum": ["active", "resolved"] },
+    "triggered_at": { "type": "string", "format": "date-time" },
+    "evidence_event_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "reason_code": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "message": { "type": "string", "description": "Fixed template text, not LLM-generated" }
+  }
+}
