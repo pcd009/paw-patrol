@@ -3,6 +3,7 @@
 Usage (run on Windows / native OS, not inside WSL), from any folder:
     python tools/collar_receiver.py                      # saves to <project>/sessions/<date_time>/
     python tools/collar_receiver.py --out sessions/dog1  # choose the folder
+    python tools/collar_receiver.py --out sessions/dog1 --stop-after-lost 10   # end when the collar is off 10 s
 
 Files written (all updated live, safe to read while the receiver runs):
     <out>/imu.csv        every sample, 50 per second (t_laptop + the collar's fields)
@@ -56,9 +57,11 @@ class Receiver:
         self.live_path = os.path.join(out_dir, "live.json")
         self.collar_ip = None
         self.count, self.last_print, self.last_live = 0, time.time(), 0.0
+        self.started, self.saved = time.time(), 0  # for the "rec mm:ss, N saved" status field
         self.last_seq, self.dropped, self.rate = None, 0, 0.0
         self.btn_prev, self.last_loud = 0, 0.0
         self.led = None  # last LED state the collar reported (CALM / ATTN / ALERT / ...)
+        self.stop_reason = "ctrl-c"
 
     def log_event(self, kind, t=None, **extra):
         t = t or time.time()
@@ -90,6 +93,7 @@ class Receiver:
         self.last_seq = seq
         self.count += 1
         self.imu.write(f"{now:.3f}," + ",".join(parts) + "\n")
+        self.saved += 1
 
         if int(s["btnA"]) and not self.btn_prev:
             log("*** EVENT MARKER ***", now)
@@ -123,7 +127,8 @@ class Receiver:
 
         if wall - self.last_print >= 0.5:
             self.rate = self.count / (wall - self.last_print)
-            log(f"collar {int(s['ms']) / 1000:8.2f}s | {self.rate:4.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
+            rec = int(wall - self.started)
+            log(f"REC {rec // 60:02d}:{rec % 60:02d} {self.saved:>7} saved | {self.rate:4.1f} Hz | |a|={mag:4.2f} g  pitch={pitch:6.1f}  roll={roll:6.1f} | "
                 f"gyro=({s['gx']},{s['gy']},{s['gz']}) | mic={s['mic']:>4} {'#' * min(int(s['mic']) // 20, 20):<20} | "
                 f"A={s['btnA']} B={s['btnB']} | dropped={self.dropped}", now)
             self.count, self.last_print = 0, wall
@@ -132,6 +137,8 @@ class Receiver:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", help="folder to save into (default: <project>/sessions/<date_time>)")
+    ap.add_argument("--stop-after-lost", type=float, default=0, metavar="SECONDS",
+                    help="stop recording once the collar has sent nothing for this long (default: keep waiting)")
     args = ap.parse_args()
 
     out_dir = os.path.abspath(args.out or os.path.join(SESSIONS_DIR, time.strftime("%Y%m%d_%H%M%S")))
@@ -140,6 +147,17 @@ def main():
     with open(os.path.join(SESSIONS_DIR, "current.txt"), "w") as f:
         f.write(out_dir)
     rx = Receiver(out_dir)
+    # which clock these timestamps come from -- needed to sync with video recorded on another device
+    rx.log_event("recording_started", host=socket.gethostname(), utc_offset=time.strftime("%z"),
+                 stop_after_lost_s=args.stop_after_lost or None)
+    try:
+        run(rx, out_dir, args.stop_after_lost)
+    finally:
+        rx.log_event("recording_stopped", reason=rx.stop_reason)
+        log(f"Recording stopped ({rx.stop_reason}). Saved to {out_dir}")
+
+
+def run(rx, out_dir, stop_after_lost):
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)  # big buffer: no loss if we stall briefly
@@ -161,6 +179,8 @@ def main():
     threading.Thread(target=command_loop, daemon=True).start()
 
     connected = False
+    lost_since = None
+    rx.stop_reason = "ctrl-c"
     while True:
         try:
             data, addr = sock.recvfrom(4096)
@@ -169,7 +189,12 @@ def main():
             if connected:
                 rx.log_event("collar_lost")
                 connected = False
+                lost_since = time.time()
+            if stop_after_lost and lost_since and time.time() - lost_since >= stop_after_lost:
+                rx.stop_reason = "collar_off"
+                return
             continue
+        lost_since = None
         if not connected:
             log(f"Collar {'connected' if rx.collar_ip is None else 'data resumed'} from {addr[0]}")
             rx.log_event("collar_connected", ip=addr[0])

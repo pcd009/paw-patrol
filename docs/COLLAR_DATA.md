@@ -38,6 +38,8 @@ collar  --"LED,<state>" report on :4210-->   receiver logs it as an `led` event
 
 - The receiver must be running for data to be saved: `python tools/collar_receiver.py`
   (Windows, not WSL; WSL can't receive the collar's UDP). Use `--out sessions/<name>` to name the folder.
+  It records until you press Ctrl-C. Add `--stop-after-lost 10` to also stop once the collar has been off 10 s
+  (without it, the receiver waits and resumes into the same folder when the collar comes back).
 - **Your code should read the files, not the UDP socket.** Only one program can listen on port 4210.
 - No collar or dog available? Replay a recording: `python tools/replay_session.py samples/bench_handheld_25s`
   while the receiver runs. It produces a new session exactly like live data. Use `--speed 1` when timing
@@ -81,6 +83,8 @@ t_laptop,seq,ms,ax,ay,az,gx,gy,gz,mic,btnA,btnB,loud
 
 | `type` | Extra fields | Meaning |
 |---|---|---|
+| `recording_started` | `host`, `utc_offset`, `stop_after_lost_s` | The receiver started. `host` = whose clock `t` is (for syncing with video from another device) |
+| `recording_stopped` | `reason` | `ctrl-c` or `collar_off` (with `--stop-after-lost`) |
 | `collar_connected` | `ip` | Data started or resumed |
 | `collar_lost` | none | No data for 1 s (Wi-Fi drop, power bank off…). A candidate rule: "collar offline" |
 | `marker` | none | Handler pressed button A: "the dog changed activity now" (ground truth) |
@@ -137,6 +141,9 @@ rules and LLM doing separate jobs. Keep LED logic in the rules code, never behin
   though they arrive 5 per packet.
 - **Sync check** at the start of every recording session: clap in front of the webcam while pressing button A.
   The `marker` event and the clap in the audio/video should coincide; if not, apply the offset.
+- **Video from another device (iPhone / Mac camera):** its clock differs from the receiver laptop's. The video
+  file's metadata gives its start time (~1 s precision); the clap + button A marker gives the exact offset.
+  `dog-behavior-system/scripts/process_session.py <video> --collar sessions/<name>` does both automatically.
 
 ---
 
