@@ -256,8 +256,8 @@ All files are written live, so they're safe to read while the receiver runs.
 | File | What's in it | Use it for |
 |---|---|---|
 | `imu.csv` | Every sample, 50 per second | Activity classification (sliding 2 s windows), replaying a session |
-| `events.jsonl` | One JSON object per line: `marker` (button A), `loud`, `collar_connected`, `collar_lost` | Timeline events, ground-truth labels, rules ("collar data lost") |
-| `live.json` | Latest sample + `mag`, `pitch`, `roll`, `rate_hz`, `collar_ip`, rewritten 10× per second | Dashboard gauges, a quick "is it alive" check |
+| `events.jsonl` | One JSON object per line: `marker` (button A), `loud`, `led` (every LED change, whoever caused it), `collar_connected`, `collar_lost` | Timeline events, ground-truth labels, rules ("collar data lost"), the rule-alert history for the deck |
+| `live.json` | Latest sample + `mag`, `pitch`, `roll`, `rate_hz`, `led`, `collar_ip`, rewritten 10× per second | Dashboard gauges, a quick "is it alive" check |
 
 **`imu.csv` columns:**
 `t_laptop, seq, ms, ax, ay, az (g), gx, gy, gz (deg/s), mic, btnA, btnB, loud`
@@ -269,7 +269,10 @@ All files are written live, so they're safe to read while the receiver runs.
 ```json
 {"t": 1790496054.476, "type": "marker"}
 {"t": 1790496054.882, "type": "loud", "mic": 300}
+{"t": 1790496055.120, "type": "led", "state": "ALERT"}
 ```
+`led` states: `CALM`, `ATTN`, `ALERT`, `OFF`, `RGB r g b`, `SENSOR_FAULT`. The collar itself reports each change,
+so it's logged even when your code sends the command straight to the collar.
 
 **Reading it from Python:**
 ```python

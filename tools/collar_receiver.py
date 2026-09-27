@@ -6,7 +6,7 @@ Usage (run on Windows / native OS, not inside WSL), from any folder:
 
 Files written (all updated live, safe to read while the receiver runs):
     <out>/imu.csv        every sample, 50 per second (t_laptop + the collar's fields)
-    <out>/events.jsonl   one JSON object per line: marker (button A), loud, collar_connected, collar_lost
+    <out>/events.jsonl   one JSON object per line: marker (button A), loud, led, collar_connected, collar_lost
     <out>/live.json      latest sample + tilt/magnitude, rewritten ~10x per second
     <project>/sessions/current.txt   path of the folder currently being written
 
@@ -48,6 +48,7 @@ class Receiver:
         self.count, self.last_print, self.last_live = 0, time.time(), 0.0
         self.last_seq, self.dropped, self.rate = None, 0, 0.0
         self.btn_prev, self.last_loud = 0, 0.0
+        self.led = None  # last LED state the collar reported (CALM / ATTN / ALERT / ...)
 
     def log_event(self, kind, t=None, **extra):
         self.events.write(json.dumps({"t": round(t or time.time(), 3), "type": kind, **extra}) + "\n")
@@ -56,7 +57,13 @@ class Receiver:
         # One packet holds several samples (one CSV line each). Spread their laptop timestamps
         # back from the arrival time using the collar's own millisecond clock.
         arrived = time.time()
-        rows = [line.split(",") for line in data.decode(errors="ignore").strip().splitlines()]
+        lines = data.decode(errors="ignore").strip().splitlines()
+        for line in lines:
+            if line.startswith("LED,"):  # the collar confirms every LED change, whoever triggered it
+                self.led = line[4:]
+                print(f"💡 LED -> {self.led}")
+                self.log_event("led", arrived, state=self.led)
+        rows = [line.split(",") for line in lines if not line.startswith("LED,")]
         rows = [r for r in rows if len(r) == len(FIELDS)]
         if not rows:
             return
@@ -99,7 +106,7 @@ class Receiver:
                 "mic": int(s["mic"]), "loud": int(s["loud"]),
                 "btnA": int(s["btnA"]), "btnB": int(s["btnB"]),
                 "rate_hz": round(self.rate, 1), "dropped": self.dropped,
-                "collar_ip": self.collar_ip, "cmd_port": CMD_PORT,
+                "led": self.led, "collar_ip": self.collar_ip, "cmd_port": CMD_PORT,
             })
             self.last_live = wall
 

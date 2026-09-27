@@ -4,6 +4,7 @@
 //   accel in g, gyro in deg/s, mic = peak-to-peak ADC counts over the last 20 ms (0 if unused),
 //   buttons 1 = pressed, loud = 1 if the mic is well above its background level (onboard LED flashes)
 // Listens for LED commands on CMD_PORT: "CALM", "ATTN", "ALERT", "OFF" or "LED r g b" (0-255)
+// Every LED change is reported back to the laptop as a separate packet "LED,<state>" so it gets logged
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -46,6 +47,7 @@ IPAddress laptop;
 uint32_t seq = 0;
 uint32_t nextSampleUs = 0;
 bool mpuOk = false;
+bool sensorFault = false;
 char batchBuf[BATCH * 128];
 int batchLen = 0, batchCount = 0;
 int micLo = 4095, micHi = 0;   // min/max since the last packet
@@ -113,6 +115,15 @@ void setLed(int r, int g, int b) {
   }
 }
 
+// Tell the laptop the LED changed (separate packet, not part of the sample batch)
+void reportLed(const String &state) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  String msg = "LED," + state + "\n";
+  udp.beginPacket(laptop, DATA_PORT);
+  udp.write((const uint8_t*)msg.c_str(), msg.length());
+  udp.endPacket();
+}
+
 void handleCommands() {
   int n = cmdUdp.parsePacket();
   if (n <= 0) return;
@@ -130,7 +141,9 @@ void handleCommands() {
     int r = 0, g = 0, b = 0;
     sscanf(buf + 3, "%d %d %d", &r, &g, &b);
     setLed(r, g, b);
-  }
+    cmd = "RGB " + String(r) + " " + String(g) + " " + String(b);
+  } else return;  // unknown command: ignore
+  reportLed(cmd);
 }
 
 void connectWifi() {
@@ -147,6 +160,7 @@ void connectWifi() {
   digitalWrite(BOARD_LED, LOW);  // off; flashes on loud sounds
   Serial.printf("\nConnected. ESP32 IP: %s\n", WiFi.localIP().toString().c_str());
   setLed(0, 255, 0);
+  reportLed("CALM");
 }
 
 void setup() {
@@ -182,6 +196,12 @@ void loop() {
   if (!mpuOk || !mpuRead(a, g)) {
     mpuOk = mpuInit();  // try to recover from a loose wire
     setLed(255, 0, 255);  // purple = sensor problem
+    if (!sensorFault) reportLed("SENSOR_FAULT");
+    sensorFault = true;
+  } else if (sensorFault) {
+    sensorFault = false;
+    setLed(0, 255, 0);
+    reportLed("CALM");
   }
 
   bool loud;
