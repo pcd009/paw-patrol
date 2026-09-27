@@ -58,6 +58,70 @@ but please **borrow 3 resistors** from another team or the organisers. (If your 
 
 ---
 
+## 2b. Wiring / soldering diagram
+
+Pin names are the labels **printed on the Glyph board** (GPIO number in brackets). Every "3.3V" and "GND" can go
+to any 3.3V / GND pin on the board, or to the breadboard + / − rails fed from them.
+
+```
+  PART                   PART PIN                              GLYPH C6 PIN
+ ┌───────────────┐
+ │ MPU6050       │  VCC ────────────────────────────────────── 3.3V
+ │ motion sensor │  GND ────────────────────────────────────── GND
+ │               │  SDA ────────────────────────────────────── SDA  (IO4)
+ │               │  SCL ────────────────────────────────────── SCL  (IO5)
+ └───────────────┘  XDA, XCL, AD0, INT: not connected
+
+ ┌───────────────┐
+ │ RGB LED       │  long leg (common +) ────────────────────── 3.3V
+ │ common anode  │  red   ───[resistor]─────────────────────── D18  (IO18)
+ │               │  green ───[resistor]─────────────────────── D19  (IO19)
+ │               │  blue  ───[resistor]─────────────────────── D20  (IO20)
+ └───────────────┘  resistor = 220–330 Ω each (firmware dims the LED if you have none)
+
+ ┌───────────────┐
+ │ Mic           │  +  (pin NOT touching the case) ──┬──[2.2k]── 3.3V
+ │ electret      │                                   └────────── A2   (IO2)
+ │               │  −  (pin touching the metal case) ──────────── GND
+ └───────────────┘  weak signal? put both 2.2k in series (4.4k)
+
+ ┌───────────────┐
+ │ Button A      │  one leg ────────────────────────────────── D6   (IO6)
+ │ event marker  │  diagonally opposite leg ────────────────── GND
+ └───────────────┘
+ ┌───────────────┐
+ │ Button B      │  one leg ────────────────────────────────── A3   (IO3)
+ │ spare         │  diagonally opposite leg ────────────────── GND
+ └───────────────┘
+
+ Power: USB-C from the laptop or a power bank.
+ Onboard LED (IO14): flashes when the mic hears a loud sound.
+ Leave free: IO8, IO9 (boot mode), IO12, IO13 (USB).
+```
+
+**Same thing as a table, by board pin:**
+
+| Glyph pin | Connected to |
+|---|---|
+| 3.3V | MPU6050 VCC · LED long leg · 2.2k resistor to mic + |
+| GND | MPU6050 GND · mic − · Button A · Button B |
+| SDA (IO4) | MPU6050 SDA |
+| SCL (IO5) | MPU6050 SCL |
+| A2 (IO2) | Mic + |
+| A3 (IO3) | Button B |
+| D6 (IO6) | Button A |
+| D18 (IO18) | LED red (via resistor) |
+| D19 (IO19) | LED green (via resistor) |
+| D20 (IO20) | LED blue (via resistor) |
+
+4-leg push buttons: the two legs on the *same side* (the ones facing each other across the gap) are always
+connected. Use two **diagonally opposite** legs so the button actually switches.
+
+**Check before soldering:** on the breadboard, type `calm` in the receiver. It must be **green**. If it's blue,
+the green and blue legs are swapped: swap those two wires (a common mix-up, since the legs sit side by side).
+
+---
+
 ## 3. Step-by-step
 
 ### Step 0: Laptop setup (10 min)
