@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from contracts.common import SCHEMA_VERSION, new_id, now_iso
-from services.llm_common import call_claude_json
+from services.llm_common import call_claude_json, clamp01
 
 DECISIONS = ["routine", "monitor", "notify", "insufficient_evidence"]
 
@@ -31,7 +31,11 @@ sturdy/even-tempered breed) but stay cautious: state uncertainty explicitly in t
 insufficient_evidence over notify.
 - decision: routine (nothing notable), monitor (worth watching, not urgent), notify (owner \
 should be told/check now), insufficient_evidence (not enough signal to say anything useful).
-- owner_message: 1-3 short, plain-language sentences suitable for a phone notification.
+- Locations: only mention where the dog was if an event's zone is not "unknown"; \
+never guess a location.
+- owner_message: 1-2 short, plain-language sentences suitable for a phone notification. \
+Never mention ids, zones' internal names, confidence numbers, or system terms (events, alerts, \
+packets) in owner_message, uncertainty, or suggested_check; write for a non-technical owner.
 Respond with only the required JSON, no extra commentary."""
 
 SCHEMA = {
@@ -118,7 +122,7 @@ def triage(packet: dict) -> dict:
         "created_at": now_iso(),
         "model": model_label,
         "decision": decision,
-        "confidence": float(data.get("confidence", 0.4) or 0.4),
+        "confidence": clamp01(data.get("confidence"), 0.4),
         "evidence_event_ids": evidence_ids,
         "referenced_alert_ids": alert_ids,
         "owner_message": data.get("owner_message") or "No assessment available.",

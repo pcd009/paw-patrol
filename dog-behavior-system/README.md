@@ -1,7 +1,30 @@
-# Dog Behaviour Recognition -- Hackathon Prototype
+# 🐾 Paw Patrol -- Hackathon Prototype
+
+An at-home dog monitor for working owners: a camera + mic (and a gyro collar) watch the dog,
+Claude turns what they see into a plain-language picture of the dog's day.
+
+## Owner dashboard (http://localhost:8000)
+
+- **Live view** with what the dog is doing right now ("Resting, for 25 min").
+- **Today**: a Claude-written check-in (headline, 2-3 sentence story, highlights, "anything to do?"),
+  refreshed every 5 min when there's news (`digest.min_interval_s`). Built from the day summary, not raw events.
+- **Tiles**: active minutes vs. daily goal, rest time, longest nap, barks/whines, door-button presses, collar status.
+- **Day at a glance**: 15-min colour strip of the day + time per activity (resting / calm / walking /
+  running & play / exploring). Trotting + galloping are one "Running" for owners; the log keeps the exact gait.
+- **Moments** (photos of naps, zoomies, door requests), **Recent changes** (last 5 behaviour changes),
+  **Alerts & sounds today**, and **Ask Paw Patrol** (answers from the whole day).
+- Dog profile (name, breed, age, activity goal) lives in `config.yaml` -> `dog`.
+
+History is saved per local day in `data/history/YYYY-MM-DD.jsonl` (+ `thumbs/`) and reloaded on restart.
+For the pitch, seed a realistic day up to now (clearly badged "includes demo history" in the UI):
+
+    .venv/bin/python -m scripts.seed_demo_day --replace
+
+---
+
 
 A camera + mic watch a Labrador, turn what they see/hear into structured `BehaviorEvent`s, a
-deterministic rule engine raises `Alert`s from those events, and Claude Sonnet explains the
+deterministic rule engine raises `Alert`s from those events, and Claude Haiku explains the
 situation to the owner with explicit uncertainty -- **the LLM never creates or edits an alert.**
 Every input and output sits behind a swappable adapter so tomorrow's hardware (an ESP32
 dog-pressable button, an ESP32 LED/buzzer mirror, maybe an MPU6050 IMU collar) plugs in without
@@ -23,7 +46,7 @@ scripts/run_demo.sh live 0 mic
 
 `ANTHROPIC_API_KEY` is optional. If it's unset (or the API errors/refuses), every Claude call
 falls back to a deterministic mock so the demo still runs end-to-end -- the dashboard's model
-badge always says which one happened (`model: mock` vs `model: claude-sonnet-5`).
+badge always says which one happened (`AI: mock` vs `AI: Claude (live)`).
 
 Run the pieces independently if you like:
 ```bash
@@ -36,7 +59,7 @@ python3 -m contracts.validate                      # check every fixture against
 
 ```
  VideoSource ---\                                    +-----------------+
-                 >-- video_detector.py --+            |  Claude Sonnet  |
+                 >-- video_detector.py --+            |  Claude Haiku  |
  (webcam/file/   |   (YOLO + gait        |            |  (vision, low   |
   RTSP url)      |    heuristic +        |            |   effort JSON)  |
                  |    vision_labeler)    |            +---------^-------+

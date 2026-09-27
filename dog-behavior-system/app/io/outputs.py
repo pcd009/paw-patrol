@@ -19,11 +19,42 @@ class OutputSink:
 
 
 class ConsoleSink(OutputSink):
+    """Prints one human-readable line per event / alert / Claude assessment, so the terminal
+    reads as a shareable event log."""
+
+    def __init__(self):
+        self._device = None
+
+    @staticmethod
+    def _clock(iso: Optional[str] = None) -> str:
+        from datetime import datetime
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone() if iso else datetime.now()
+        return dt.strftime("%H:%M:%S")
+
     def update_device(self, led: str, buzzer: bool) -> None:
-        print(f"[device] led={led} buzzer={'1' if buzzer else '0'}")
+        if (led, buzzer) != self._device:  # only log changes
+            self._device = (led, buzzer)
+            print(f"{self._clock()}  DEVICE   led={led} buzzer={'on' if buzzer else 'off'}", flush=True)
 
     def notify(self, kind: str, payload: dict) -> None:
-        print(f"[{kind}] {json.dumps(payload)[:300]}")
+        if kind == "event":
+            from datetime import datetime
+            start = datetime.fromisoformat(payload["started_at"].replace("Z", "+00:00"))
+            end = datetime.fromisoformat(payload["ended_at"].replace("Z", "+00:00"))
+            det = payload.get("evidence", {}).get("detector", "")
+            how = "claude" if ("vision_strip" in det and "mock" not in det) else det.split("+")[-1] or "?"
+            print(f"{self._clock(payload['started_at'])}  EVENT    {payload['label']:<15} "
+                  f"{(end - start).total_seconds():5.1f}s  {payload['source']:<6} {how:<16} "
+                  f"conf {payload['confidence']:.2f}", flush=True)
+        elif kind == "alert":
+            print(f"{self._clock(payload['triggered_at'])}  ALERT    {payload['severity']}: "
+                  f"{payload['message']}", flush=True)
+        elif kind == "triage":
+            who = "mock" if payload.get("model") == "mock" else "claude"
+            print(f"{self._clock(payload['created_at'])}  ASSESS   [{who}] {payload['decision']}: "
+                  f"{payload['owner_message']}", flush=True)
+        else:
+            print(f"{self._clock()}  {kind.upper():<8} {json.dumps(payload)[:200]}", flush=True)
 
 
 class DeviceStateSink(OutputSink):

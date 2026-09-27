@@ -3,9 +3,21 @@
 
 subject_id: demo_dog_01
 
+# Shown on the dashboard and used by Claude's daily summary.
+dog:
+  name: "Bruno"
+  breed: "Labrador Retriever"
+  age: "3 years"
+  daily_activity_goal_min: 60   # active minutes (walking + running + exploring) per day
+
+digest:
+  min_interval_s: 300   # the Claude "today" story refreshes at most this often (if new events)
+
 # Zones as normalized [x0, y0, x1, y1] rects over the camera frame (0..1, origin top-left).
 # The dog's zone = whichever rect contains the bbox-centre; "unknown" if none match.
 # Tune these at the venue by eyeballing the webcam frame.
+# Off by default: zones only make sense once the rects match a fixed, mounted camera.
+zones_enabled: false
 zones:
   door_area: [0.0, 0.0, 0.35, 0.55]
   bed_area: [0.65, 0.0, 1.0, 0.55]
@@ -15,7 +27,9 @@ zones:
 adapters:
   # VideoSource: webcam index ("0"), a file path, or an rtsp/http URL (phone IP-cam).
   video_source: "0"
-  video_fps_sample: 8
+  video_fps_sample: 8      # frames/s sent to YOLO (detection)
+  display_fps: 0           # dashboard stream cap; 0 = every frame at the source's native fps
+  loop_video_files: true   # replay demo clips in a loop
   # AudioSource: "mic" for sounddevice input, or a wav/mp4 file path. null disables audio.
   audio_source: null
   # Output sinks to enable, in order. Options: console, device_state, serial, webhook
@@ -31,9 +45,11 @@ thresholds:
     trotting_max: 4.5
     # above trotting_max => galloping
   vision_labeler:
-    min_interval_s: 3
-    max_interval_s: 10
-    stationary_speed_max: 0.6   # only call the labeler when gait says "stationary or slow"
+    interval_s: 2.0      # one Claude vision call per this many seconds while a dog is visible
+    strip_frames: 4      # dog crops per call (lets Claude judge gait and mouth movement)
+    strip_span_s: 1.2    # time span the crops cover
+    vote_over: 3         # label = confidence-weighted vote over the last N Claude answers
+    max_age_s: 6.0       # after this, fall back to heuristics until a new Claude label arrives
   audio:
     window_s: 1.0
     hop_s: 0.5
@@ -42,6 +58,7 @@ thresholds:
     whine_ast_labels: ["Whimper (dog)", "Whimper", "Howl"]
   segmenter:
     stable_window_s: 1.0
+    max_segment_s: 5.0   # long behaviours are posted every N s so the timeline stays live
 
 server:
   host: "0.0.0.0"
@@ -53,4 +70,4 @@ triage:
 
 llm:
   model_env_var: "CLAUDE_MODEL"
-  default_model: "claude-sonnet-5"
+  default_model: "claude-haiku-4-5"

@@ -29,6 +29,7 @@ class SharedZone:
 
 
 def post_event(server: str, event: dict) -> None:
+    thumb = event.pop("_thumb", None)
     try:
         validate(event, "behavior_event")
     except ValueError as e:
@@ -36,33 +37,67 @@ def post_event(server: str, event: dict) -> None:
         return
     try:
         requests.post(f"{server}/api/events", json=event, timeout=3)
-        print(f"[run] -> {event['source']:>5} {event['label']:<15} {event['zone']}")
+        if thumb:
+            requests.post(f"{server}/api/events/{event['event_id']}/thumb", data=thumb,
+                          headers={"Content-Type": "image/jpeg"}, timeout=3)
+        # the orchestrator's ConsoleSink logs the event -- no duplicate line here
     except Exception as e:
         print(f"[run] POST /api/events failed: {e}")
 
 
-def run_video(video_src: str, server: str, subject_id: str, shared_zone: SharedZone) -> None:
-    vs = VideoSource(video_src, target_fps=cfg_get("adapters", "video_fps_sample", default=8))
-    detector = VideoDetector(vs)
-    t0_wall = datetime.now(timezone.utc)
-    stable_s = cfg_get("thresholds", "segmenter", "stable_window_s", default=1.0)
-    seg = Segmenter(subject_id, "video", t0_wall, stable_window_s=stable_s)
-    last_frame_post = 0.0
-    try:
-        for sample in detector.samples():
-            if sample.get("zone") and sample["zone"] != "unknown":
-                shared_zone.zone = sample["zone"]
-            ev = seg.push(sample)
-            if ev:
-                post_event(server, ev)
-            now = time.monotonic()
-            if detector.last_annotated_jpeg and now - last_frame_post > 0.5:
-                last_frame_post = now
+def run_display(vs: VideoSource, detector: VideoDetector, server: str, fps: float) -> None:
+    """Post every new frame (with the latest detection box drawn on it) as it arrives --
+    the source's native fps -- capped at `fps` if > 0. Independent of detection speed."""
+    import cv2
+    session = requests.Session()
+    min_period = 1.0 / fps if fps and fps > 0 else 0.0
+    last_seq = 0
+    while not vs.ended:
+        started = time.monotonic()
+        item = vs.wait_newer(last_seq)
+        if item is not None and item[2] != last_seq:
+            _, frame, last_seq = item
+            if detector.overlay:
+                frame = VideoDetector._draw(frame, *detector.overlay)
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            if ok:
                 try:
-                    requests.post(f"{server}/api/frame", data=detector.last_annotated_jpeg,
-                                  headers={"Content-Type": "image/jpeg"}, timeout=2)
+                    session.post(f"{server}/api/frame", data=buf.tobytes(),
+                                 headers={"Content-Type": "image/jpeg"}, timeout=1)
                 except Exception as e:
                     print(f"[run] POST /api/frame failed: {e}")
+                    time.sleep(1)
+        if min_period:
+            time.sleep(max(0.0, min_period - (time.monotonic() - started)))
+
+
+def run_video(video_src: str, server: str, subject_id: str, shared_zone: SharedZone) -> None:
+    vs = VideoSource(video_src, target_fps=cfg_get("adapters", "video_fps_sample", default=8),
+                     loop_files=cfg_get("adapters", "loop_video_files", default=True)).start()
+    detector = VideoDetector(vs)
+    threading.Thread(target=run_display, daemon=True,
+                     args=(vs, detector, server, cfg_get("adapters", "display_fps", default=0))).start()
+    t0_wall = datetime.now(timezone.utc)
+    stable_s = cfg_get("thresholds", "segmenter", "stable_window_s", default=1.0)
+    seg = Segmenter(subject_id, "video", t0_wall, stable_window_s=stable_s,
+                    max_segment_s=cfg_get("thresholds", "segmenter", "max_segment_s", default=5.0))
+    session = requests.Session()
+    last_current_post = 0.0
+    try:
+        for sample in detector.samples():
+            now = time.monotonic()
+            if now - last_current_post >= 0.25:  # live "what is the dog doing now" for the dashboard
+                last_current_post = now
+                try:
+                    session.post(f"{server}/api/current", json={"current": detector.current}, timeout=1)
+                except Exception:
+                    pass
+            if sample is not None:
+                if sample.get("zone") and sample["zone"] != "unknown":
+                    shared_zone.zone = sample["zone"]
+                ev = seg.push(sample)
+                if ev:
+                    post_event(server, ev)
     finally:
         ev = seg.flush()
         if ev:

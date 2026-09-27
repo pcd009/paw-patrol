@@ -6,6 +6,8 @@ feed the same Segmenter shape: {"t": seconds_since_stream_start, "label", "confi
 """
 from __future__ import annotations
 
+from collections import Counter, deque
+
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -13,17 +15,21 @@ from contracts.common import SCHEMA_VERSION, new_id, to_iso
 
 
 class Segmenter:
-    def __init__(self, subject_id: str, source: str, t0_wall: datetime, stable_window_s: float = 1.0):
+    def __init__(self, subject_id: str, source: str, t0_wall: datetime, stable_window_s: float = 1.0,
+                 max_segment_s: float = 5.0):
         self.subject_id = subject_id
         self.source = source
         self.t0_wall = t0_wall
         self.stable_window_s = stable_window_s
+        self.max_segment_s = max_segment_s
+        self._window = deque()
         self._label: Optional[str] = None
         self._zone: Optional[str] = None
         self._detector: Optional[str] = None
         self._start_t: Optional[float] = None
         self._end_t: Optional[float] = None
         self._confs = []
+        self._thumb = None
         self._pending_label: Optional[str] = None
         self._pending_start_t: Optional[float] = None
 
@@ -47,6 +53,8 @@ class Segmenter:
             "ended_at": to_iso(ended),
             "zone": self._zone or "unknown",
             "evidence": {"detector": self._detector or "unknown"},
+            # not part of the contract: run.py pops this and uploads it separately
+            "_thumb": self._thumb,
         }
 
     def _start(self, sample: dict) -> None:
@@ -56,44 +64,44 @@ class Segmenter:
         self._start_t = sample["t"]
         self._end_t = sample["t"]
         self._confs = [sample.get("confidence", 0.5)]
+        self._thumb = sample.get("thumb")
 
     def push(self, sample: dict) -> Optional[dict]:
-        """Feed one raw sample. Returns a finished BehaviorEvent dict whenever a segment closes
-        (label change confirmed stable for >= stable_window_s), else None. Call flush() at the
-        end of the stream to emit the last open segment."""
+        """Feed one raw sample. Returns a BehaviorEvent dict whenever a segment closes, else None.
+        A segment closes when (a) a different label holds the majority (>= 60%) of the last
+        stable_window_s of samples -- so flicker between two new labels still counts as a change --
+        or (b) it has run for max_segment_s, so long behaviours still reach the timeline live.
+        Call flush() at the end of the stream to emit the last open segment."""
         label = sample["label"]
         t = sample["t"]
+        self._window.append((t, label, sample))
+        while self._window and t - self._window[0][0] > self.stable_window_s:
+            self._window.popleft()
 
         if self._label is None:
             self._start(sample)
             return None
 
-        if label == self._label:
-            self._pending_label = None
-            self._end_t = t
-            self._confs.append(sample.get("confidence", 0.5))
-            return None
+        counts = Counter(l for _, l, _ in self._window)
+        top, n = counts.most_common(1)[0]
+        window_full = t - self._window[0][0] >= 0.8 * self.stable_window_s
 
-        if self._pending_label != label:
-            # first sighting of a candidate new label -- don't commit yet
-            self._pending_label = label
-            self._pending_start_t = t
+        if top != self._label and window_full and n / len(self._window) >= 0.6:
+            first = next(x for x in self._window if x[1] == top)
+            self._end_t = first[0]
+            finished = self._emit()
+            self._start({**first[2], "t": first[0]})
             self._end_t = t
-            return None
+            return finished
 
-        if t - self._pending_start_t < self.stable_window_s:
-            # still flickering -- keep extending the current (previous) segment
-            self._end_t = t
-            return None
-
-        # stable for >= stable_window_s: commit the switch at the moment the new label began
-        self._end_t = self._pending_start_t
-        finished = self._emit()
-        self._start({**sample, "t": self._pending_start_t})
         self._end_t = t
-        self._confs.append(sample.get("confidence", 0.5))
-        self._pending_label = None
-        return finished
+        if label == self._label:
+            self._confs.append(sample.get("confidence", 0.5))
+        if t - self._start_t >= self.max_segment_s:
+            finished = self._emit()
+            self._start({**sample, "label": self._label, "zone": self._zone, "t": t})
+            return finished
+        return None
 
     def flush(self) -> Optional[dict]:
         ev = self._emit()

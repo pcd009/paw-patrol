@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import queue
+import threading
 import time
 from typing import Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -18,10 +19,17 @@ class VideoSource:
     """Wraps cv2.VideoCapture. `source` is a webcam index ("0"), a file path, or an
     rtsp://... / http://... URL (e.g. a phone running an IP-cam app)."""
 
-    def __init__(self, source: str, target_fps: float = 8.0):
+    def __init__(self, source: str, target_fps: float = 8.0, loop_files: bool = True, max_width: int = 1280):
         self.source_raw = source
-        self.target_fps = target_fps
+        self.target_fps = target_fps  # detection sampling rate; the display gets every frame
+        self.loop_files = loop_files
+        self.max_width = max_width
         self._cap = None
+        self._lock = threading.Condition()
+        self._latest = None  # (t_seconds_since_start, frame_bgr, seq)
+        self.native_fps = 30.0
+        self._reader = None
+        self.ended = False
 
     def _resolve(self):
         s = self.source_raw
@@ -36,24 +44,76 @@ class VideoSource:
             raise RuntimeError(f"VideoSource: could not open {self.source_raw!r}")
         return self
 
-    def frames(self) -> Iterator[Tuple[float, "np.ndarray"]]:
-        """Yield (t_seconds_since_start, frame_bgr) sampled at ~target_fps."""
+    def start(self) -> "VideoSource":
+        """Start a background thread that reads EVERY frame (files paced to real time and
+        looped) and keeps only the latest. Display and detection each pull at their own rate."""
+        if self._reader is None:
+            if self._cap is None:
+                self.open()
+            self._reader = threading.Thread(target=self._read_loop, daemon=True)
+            self._reader.start()
+        return self
+
+    def _read_loop(self) -> None:
         import cv2
-        if self._cap is None:
-            self.open()
         cap = self._cap
+        is_file = not isinstance(self._resolve(), int) and "://" not in str(self.source_raw)
         native_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        native_fps = native_fps if native_fps and native_fps > 0.1 else 30.0
-        step = max(1, round(native_fps / self.target_fps))
+        native_fps = native_fps if native_fps > 0.1 else 30.0
+        self.native_fps = native_fps
+        period = 1.0 / native_fps
         t0 = time.monotonic()
-        idx = 0
+        next_due = t0
+        seq = 0
         while True:
             ok, frame = cap.read()
             if not ok:
+                if is_file and self.loop_files:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
                 break
-            if idx % step == 0:
-                yield (time.monotonic() - t0), frame
-            idx += 1
+            h, w = frame.shape[:2]
+            if w > self.max_width:
+                frame = cv2.resize(frame, (self.max_width, int(h * self.max_width / w)), interpolation=cv2.INTER_AREA)
+            seq += 1
+            with self._lock:
+                self._latest = (time.monotonic() - t0, frame, seq)
+                self._lock.notify_all()
+            if is_file:  # webcams block on read() at their own rate; files must be paced
+                next_due += period
+                delay = next_due - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+                else:
+                    next_due = time.monotonic()
+        with self._lock:
+            self.ended = True
+            self._lock.notify_all()
+
+    def latest(self):
+        """(t, frame_bgr, seq) of the newest frame, or None before the first frame."""
+        with self._lock:
+            return self._latest
+
+    def wait_newer(self, seq: int, timeout: float = 1.0):
+        """Block until a frame newer than `seq` exists (or timeout/end); return latest()."""
+        with self._lock:
+            self._lock.wait_for(
+                lambda: self.ended or (self._latest is not None and self._latest[2] != seq), timeout)
+            return self._latest
+
+    def frames(self) -> Iterator[Tuple[float, "np.ndarray"]]:
+        """Yield (t_seconds_since_start, frame_bgr) at up to ~target_fps, always the newest frame."""
+        self.start()
+        period = 1.0 / max(0.1, self.target_fps)
+        last_seq = 0
+        while not (self.ended and (self._latest is None or self._latest[2] == last_seq)):
+            started = time.monotonic()
+            item = self.latest()
+            if item is not None and item[2] != last_seq:
+                last_seq = item[2]
+                yield item[0], item[1]
+            time.sleep(max(0.0, period - (time.monotonic() - started)))
 
     def release(self) -> None:
         if self._cap is not None:

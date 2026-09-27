@@ -5,24 +5,106 @@
   "description": "The single object the dashboard renders (GET /api/state).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generated_at", "subject_id", "mode", "events", "alerts", "context_packets", "triage_results", "device"],
+  "required": [
+    "schema_version",
+    "generated_at",
+    "subject_id",
+    "mode",
+    "events",
+    "alerts",
+    "context_packets",
+    "triage_results",
+    "device"
+  ],
   "properties": {
-    "schema_version": { "const": "1.0" },
-    "generated_at": { "type": "string", "format": "date-time" },
-    "subject_id": { "type": "string" },
-    "mode": { "enum": ["replay", "live"] },
-    "events": { "type": "array", "items": { "$ref": "behavior_event.json" } },
-    "alerts": { "type": "array", "items": { "$ref": "alert.json" } },
-    "context_packets": { "type": "array", "items": { "$ref": "context_packet.json" } },
-    "triage_results": { "type": "array", "items": { "$ref": "triage_result.json" } },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "replay",
+        "live"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "behavior_event.json"
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "$ref": "alert.json"
+      }
+    },
+    "context_packets": {
+      "type": "array",
+      "items": {
+        "$ref": "context_packet.json"
+      }
+    },
+    "triage_results": {
+      "type": "array",
+      "items": {
+        "$ref": "triage_result.json"
+      }
+    },
     "device": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["led", "buzzer"],
+      "required": [
+        "led",
+        "buzzer"
+      ],
       "description": "Derived ONLY from active alerts. ESP32 reads this.",
       "properties": {
-        "led": { "enum": ["green", "amber", "red"] },
-        "buzzer": { "type": "boolean" }
+        "led": {
+          "enum": [
+            "green",
+            "amber",
+            "red"
+          ]
+        },
+        "buzzer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "current": {
+      "description": "Live snapshot of what the dog is doing now (not an event). null = no dog in view.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "zone": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "claude",
+            "estimate"
+          ]
+        }
       }
     }
   }

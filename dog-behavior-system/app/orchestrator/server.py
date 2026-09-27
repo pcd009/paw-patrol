@@ -7,6 +7,7 @@ active alerts -- never from the LLM.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 import time
@@ -16,8 +17,9 @@ from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 
+from app import history
 from app.config import get as cfg_get
 from app.io.outputs import build_sinks
 from contracts.common import SCHEMA_VERSION, new_id, now_iso, parse_ts, to_iso
@@ -25,6 +27,8 @@ from contracts.validate import validate
 from services.context_rules.engine import build_context, evaluate_rules, resolve_stale
 from services.llm_triage.ask import answer as llm_answer
 from services.llm_triage.triage import triage as llm_triage
+from services.summary.daily import compute_summary
+from services.summary.digest import daily_digest
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DASHBOARD_DIR = ROOT / "app" / "dashboard"
@@ -32,8 +36,10 @@ FIXTURE_PATH = ROOT / "contracts" / "fixtures" / "demo-events.json"
 
 TRIAGE_MIN_INTERVAL_S = cfg_get("triage", "min_interval_s", default=15)
 TRIAGE_WINDOW_S = cfg_get("triage", "window_s", default=60)
+DIGEST_INTERVAL_S = cfg_get("digest", "min_interval_s", default=300)
+RULES_LOOKBACK_S = 15 * 60  # rules only need recent events; keeps ingest fast all day
 
-app = FastAPI(title="Dog Behaviour Orchestrator")
+app = FastAPI(title="Paw Patrol")
 
 
 class Store:
@@ -50,8 +56,19 @@ class Store:
         self.triage_running = False
         self.last_zone = "unknown"
         self.latest_frame: Optional[bytes] = None
+        self.current: Optional[dict] = None
+        self.thumbs: dict = {}  # event_id -> jpeg bytes (insertion-ordered, capped)
+        self.current_at = 0.0
         self.replay_running = False
         self.lock = threading.RLock()
+        # the owner's day survives restarts: reload today's events/alerts from disk
+        self.day = history.local_today()
+        self.events, self.alerts = history.load_day(self.day)
+        resolve_stale(self.alerts, datetime.now(timezone.utc))
+        self.digest: Optional[dict] = None
+        self.digest_at = 0.0
+        self.digest_event_count = -1
+        self.digest_running = False
 
         sinks_cfg = cfg_get("adapters", "output_sinks", default=["console", "device_state"])
         self.sinks, self.device_sink = build_sinks(
@@ -121,14 +138,25 @@ def maybe_run_triage() -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
-def ingest_event(event: dict) -> None:
+def ingest_event(event: dict, persist: bool = True) -> None:
     validate(event, "behavior_event")
     with store.lock:
+        if history.local_today() != store.day:  # midnight: start a fresh day
+            store.day = history.local_today()
+            store.events, store.alerts = [], []
+            store.digest, store.digest_event_count = None, -1
         store.events.append(event)
+        if persist:
+            history.append("event", event)
         if event["source"] == "video" and event["zone"] != "unknown":
             store.last_zone = event["zone"]
-        new_alerts = evaluate_rules(store.events, store.alerts)
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=RULES_LOOKBACK_S)
+        recent = [e for e in store.events if parse_ts(e["ended_at"]) >= cutoff]
+        new_alerts = evaluate_rules(recent, store.alerts)
         store.alerts.extend(new_alerts)
+        if persist:
+            for a in new_alerts:
+                history.append("alert", a)
         resolve_stale(store.alerts, datetime.now(timezone.utc))
         _push_device_state()
         for sink in store.sinks:
@@ -181,12 +209,64 @@ async def sensor_button():
     return {"ok": True, "event_id": event["event_id"]}
 
 
+@app.post("/api/events/{event_id}/thumb")
+async def post_event_thumb(event_id: str, request: Request):
+    """Picture of the dog at the start of an event (not part of the event contract)."""
+    body = await request.body()
+    with store.lock:
+        store.thumbs[event_id] = body
+        while len(store.thumbs) > 300:
+            store.thumbs.pop(next(iter(store.thumbs)))
+    history.save_thumb(event_id, body)
+    return {"ok": True}
+
+
+@app.get("/api/events/{event_id}/thumb.jpg")
+async def get_event_thumb(event_id: str):
+    with store.lock:
+        thumb = store.thumbs.get(event_id)
+    if thumb is None:
+        thumb = history.load_thumb(event_id)
+    if thumb is None:
+        return Response(status_code=404)
+    return Response(content=thumb, media_type="image/jpeg",
+                    headers={"Cache-Control": "max-age=3600"})
+
+
+@app.post("/api/current")
+async def post_current(request: Request):
+    """Detector's live snapshot of the dog's current behaviour (or null = no dog in view)."""
+    body = await request.json()
+    with store.lock:
+        store.current = body.get("current")
+        store.current_at = time.time()
+    return {"ok": True}
+
+
 @app.post("/api/frame")
 async def post_frame(request: Request):
     body = await request.body()
     with store.lock:
         store.latest_frame = body
     return {"ok": True}
+
+
+@app.get("/api/stream.mjpg")
+async def stream_frames():
+    """Continuous MJPEG stream of the latest frames; an <img> tag plays it as video."""
+    async def gen():
+        last = None
+        while True:
+            with store.lock:
+                frame = store.latest_frame
+            if frame is None:
+                frame = _placeholder_jpeg()
+            if frame is not last:
+                last = frame
+                yield (b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                       + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+            await asyncio.sleep(1 / 120)  # poll fast enough for 60 fps sources
+    return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.get("/api/frame.jpg")
@@ -211,6 +291,8 @@ async def get_state():
             "context_packets": store.context_packets[-20:],
             "triage_results": store.triage_results[-20:],
             "device": {"led": store.device_sink.led, "buzzer": store.device_sink.buzzer},
+            # live snapshot; dropped if the detector stopped sending (e.g. it was closed)
+            "current": store.current if time.time() - store.current_at < 3 else None,
         }
     return state
 
@@ -230,7 +312,9 @@ async def post_ask(request: Request):
     with store.lock:
         packets = list(store.context_packets)
         triage_results = list(store.triage_results)
-    result = llm_answer(question, packets, triage_results)
+        events, alerts = list(store.events), list(store.alerts)
+    day = compute_summary(events, alerts, profile=_profile())
+    result = llm_answer(question, packets, triage_results, day_summary=day)
     return result
 
 
@@ -260,10 +344,6 @@ def _run_replay(speed: float) -> None:
 
         with store.lock:
             store.mode = "replay"
-            store.events.clear()
-            store.alerts.clear()
-            store.context_packets.clear()
-            store.triage_results.clear()
             store.last_triage_at = None
             store.last_triage_event_count = 0
             store.last_triage_alert_ids = set()
@@ -285,7 +365,7 @@ def _run_replay(speed: float) -> None:
             ev["started_at"] = to_iso(new_started)
             ev["ended_at"] = to_iso(new_ended)
             try:
-                ingest_event(ev)
+                ingest_event(ev, persist=False)  # canned story: shown live, not saved to history
             except Exception as ex:
                 print(f"[replay] skip bad event: {ex}")
         print("[replay] done")
@@ -313,6 +393,54 @@ def _placeholder_jpeg() -> bytes:
     return _PLACEHOLDER_JPEG_CACHE
 
 
+def _profile() -> dict:
+    return cfg_get("dog", default={}) or {}
+
+
+def _maybe_refresh_digest(force: bool = False) -> None:
+    """Regenerate the Claude "today" story in the background: first time, on demand, or every
+    DIGEST_INTERVAL_S if new events arrived. Never blocks a request."""
+    with store.lock:
+        stale = time.time() - store.digest_at >= DIGEST_INTERVAL_S
+        changed = len(store.events) != store.digest_event_count
+        if store.digest_running or not (force or store.digest is None or (stale and changed)):
+            return
+        store.digest_running = True
+        events, alerts = list(store.events), list(store.alerts)
+
+    def worker():
+        try:
+            summary = compute_summary(events, alerts, profile=_profile(), has_thumb=history.has_thumb)
+            digest = daily_digest(summary)
+            with store.lock:
+                store.digest, store.digest_at = digest, time.time()
+                store.digest_event_count = len(events)
+        except Exception as e:
+            print(f"[digest] failed: {e}")
+        finally:
+            with store.lock:
+                store.digest_running = False
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
+@app.get("/api/summary")
+async def get_summary():
+    """Owner's view of today: time per activity, day timeline, moments, alerts + Claude story."""
+    with store.lock:
+        events, alerts = list(store.events), list(store.alerts)
+        digest = store.digest
+    summary = compute_summary(events, alerts, profile=_profile(), has_thumb=history.has_thumb)
+    _maybe_refresh_digest()
+    return {"summary": summary, "digest": digest}
+
+
+@app.post("/api/digest/refresh")
+async def refresh_digest():
+    _maybe_refresh_digest(force=True)
+    return {"ok": True}
+
+
 @app.get("/")
 async def dashboard_index():
     return FileResponse(str(DASHBOARD_DIR / "index.html"))
@@ -321,7 +449,8 @@ async def dashboard_index():
 def main() -> None:
     host = cfg_get("server", "host", default="0.0.0.0")
     port = cfg_get("server", "port", default=8000)
-    uvicorn.run(app, host=host, port=port)
+    # no per-request access log: the terminal should read as an event log (see ConsoleSink)
+    uvicorn.run(app, host=host, port=port, access_log=False, log_level="warning")
 
 
 if __name__ == "__main__":

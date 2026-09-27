@@ -1,295 +1,423 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dog Behaviour Monitor</title>
+<title>Paw Patrol</title>
 <style>
   :root {
-    --bg: #0f1420;
-    --panel: #161d2e;
-    --panel-2: #1d2740;
-    --border: #2a3552;
-    --text: #eef1f8;
-    --muted: #93a0c2;
-    --green: #33d17a;
-    --amber: #f5a623;
-    --red: #ef4444;
-    --blue: #4c8dff;
-    --info: #5aa9e6;
+    --bg: #0f1117; --panel: #181b24; --panel2: #1f2330; --text: #eef0f6; --muted: #8b90a3;
+    --line: #2a2e3b; --green: #3ecf6e; --amber: #f5b53d; --red: #ff5a5a; --accent: #6c8cff;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  header {
-    display: flex; align-items: center; gap: 16px; padding: 14px 24px;
-    background: var(--panel); border-bottom: 1px solid var(--border);
-  }
-  header h1 { font-size: 20px; margin: 0; flex: 0 0 auto; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px 32px; }
+
+  /* header */
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); display: flex; align-items: center;
+           gap: 12px; padding: 14px 0; }
+  .brand { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+  .dog-chip { color: var(--muted); font-size: 14px; }
   .spacer { flex: 1; }
-  .badge {
-    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
-    border-radius: 20px; font-size: 13px; font-weight: 600; border: 1px solid var(--border);
-    background: var(--panel-2);
-  }
-  .led-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px 2px currentColor; }
-  .led-green { background: var(--green); color: var(--green); }
-  .led-amber { background: var(--amber); color: var(--amber); }
-  .led-red { background: var(--red); color: var(--red); }
-  .buzzer-on { color: var(--red); font-weight: 700; }
-  button, select {
-    background: var(--blue); color: white; border: none; border-radius: 8px;
-    padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-  button:hover { filter: brightness(1.1); }
-  button:disabled { opacity: 0.5; cursor: default; }
-  select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  main {
-    display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; padding: 16px 24px;
-    max-width: 1500px; margin: 0 auto;
-  }
-  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .panel {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
-  }
-  .panel h2 { margin: 0 0 10px 0; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  #frame { width: 100%; border-radius: 8px; background: #000; display: block; aspect-ratio: 16/9; object-fit: contain; }
-  .assessment-decision { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
-  .decision-routine { color: var(--green); }
-  .decision-monitor { color: var(--amber); }
-  .decision-notify { color: var(--red); }
-  .decision-insufficient_evidence { color: var(--muted); }
-  .assessment-msg { font-size: 17px; margin: 8px 0; line-height: 1.4; }
-  .assessment-meta { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
-  .assessment-meta b { color: var(--text); }
-  .model-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-  .model-chip.mock { background: #3a3f55; color: var(--muted); }
-  .model-chip.live { background: #234a33; color: var(--green); }
-  .alert-row {
-    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
-    margin-bottom: 6px; font-size: 14px; border-left: 4px solid var(--border);
-  }
-  .sev-info { border-left-color: var(--info); background: rgba(90,169,230,0.1); }
-  .sev-warning { border-left-color: var(--amber); background: rgba(245,166,35,0.12); }
-  .sev-critical { border-left-color: var(--red); background: rgba(239,68,68,0.15); }
-  .alert-sev-label { font-weight: 700; text-transform: uppercase; font-size: 11px; }
-  .empty { color: var(--muted); font-size: 14px; font-style: italic; }
-  #timeline { max-height: 340px; overflow-y: auto; }
-  .evt-row {
-    display: grid; grid-template-columns: 70px 60px 1fr 90px; gap: 8px; align-items: center;
-    padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border);
-  }
-  .evt-row.cited { background: rgba(76,141,255,0.18); border-radius: 6px; }
-  .evt-time { color: var(--muted); }
-  .evt-source { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-  .evt-zone { color: var(--muted); text-align: right; font-size: 12px; }
-  #ask-log { max-height: 220px; overflow-y: auto; margin-bottom: 10px; }
-  .ask-q { font-weight: 700; margin-top: 10px; }
-  .ask-a { margin: 4px 0 0 0; color: var(--muted); }
-  .ask-row { display: flex; gap: 8px; }
-  .ask-row input {
-    flex: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 8px; padding: 9px 12px; font-size: 14px;
+  .pill { padding: 6px 12px; border-radius: 999px; background: var(--panel); font-size: 13px;
+          display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .pill.demo { background: #2c2440; color: #c9b6ff; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  .dot.amber { background: var(--amber); } .dot.red { background: var(--red); } .dot.grey { background: var(--muted); }
+
+  #alert { display: none; border-radius: 14px; padding: 14px 18px; font-weight: 600; margin-bottom: 16px; }
+  #alert.warning, #alert.info { display: block; background: #3a2e12; color: var(--amber); }
+  #alert.critical { display: block; background: #3d1717; color: var(--red); }
+
+  .card { background: var(--panel); border-radius: 16px; padding: 18px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+           margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .label .right { margin-left: auto; text-transform: none; letter-spacing: 0; }
+  .empty { color: var(--muted); font-size: 14px; }
+  section { margin-bottom: 16px; }
+
+  /* row 1: live + today */
+  .top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; height: 440px; }
+  .live { position: relative; background: #000; border-radius: 16px; overflow: hidden; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .live-tag { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,.6); padding: 4px 10px;
+              border-radius: 8px; font-size: 12px; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+  .live-tag .dot { background: var(--red); }
+  .now { position: absolute; left: 14px; bottom: 14px; background: rgba(15,17,23,.85); backdrop-filter: blur(6px);
+         padding: 12px 16px; border-radius: 14px; display: flex; align-items: center; gap: 12px; }
+  #now-emoji { font-size: 34px; line-height: 1; }
+  #now-text { font-size: 22px; font-weight: 700; }
+  #now-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .today { display: flex; flex-direction: column; overflow: hidden; }
+  #today-headline { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 10px; }
+  #today-story { font-size: 16px; line-height: 1.5; color: #d5d8e3; }
+  #today-highlights { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
+  #today-highlights li { background: var(--panel2); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+  #today-check { margin-top: auto; padding-top: 14px; font-size: 14px; display: flex; gap: 8px; }
+  .refresh { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px;
+             padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+
+  /* row 2: tiles */
+  .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+  .tile .big { font-size: 26px; font-weight: 800; }
+  .tile .small { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .meter { height: 6px; background: var(--line); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .meter > div { height: 100%; background: var(--green); width: 0; transition: width .4s; }
+
+  /* row 3: day timeline */
+  .strip { display: flex; height: 38px; border-radius: 8px; overflow: hidden; background: var(--panel2); }
+  .strip div { flex: 1; position: relative; border-right: 1px solid var(--bg); }
+  .strip div.sound::after { content: "🔊"; position: absolute; top: -2px; left: 50%; transform: translate(-50%, -100%);
+                            font-size: 11px; }
+  .hours { display: flex; margin-top: 6px; color: var(--muted); font-size: 11px; }
+  .hours span { flex: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 14px; font-size: 14px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  .legend b { margin-left: 4px; }
+  .strip-wrap { padding-top: 16px; }
+
+  /* row 4: moments / changes / alerts -- fixed height, never resize */
+  .bottom { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; }
+  .bottom .card { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
+  .moments { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 10px; flex: 1; min-height: 0; }
+  .moment { position: relative; border-radius: 12px; overflow: hidden; background: var(--panel2); }
+  .moment img, .moment .ph { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .moment .ph { display: flex; align-items: center; justify-content: center; font-size: 36px; }
+  .moment .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; font-size: 12px;
+                 background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+  .moment .cap b { display: block; font-size: 11px; color: #c8ccd8; font-weight: 600; }
+  .moment.blank { border: 1px dashed var(--line); background: none; }
+
+  .changes { display: grid; grid-template-rows: repeat(5, 1fr); flex: 1; min-height: 0; }
+  .change { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); min-height: 0; }
+  .change:first-child { border-top: none; }
+  .change img, .change .ph { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex: none;
+                             background: var(--panel2); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .change .txt b { display: block; font-size: 15px; }
+  .change .txt span { color: var(--muted); font-size: 13px; }
+  .change .when { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .change .when.now { color: var(--green); font-weight: 700; }
+  .change.blank { color: var(--line); }
+
+  .feed { overflow-y: auto; flex: 1; min-height: 0; }
+  .feed-row { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; align-items: baseline; }
+  .feed-row:first-child { border-top: none; }
+  .feed-row .t { color: var(--muted); font-size: 13px; width: 44px; flex: none; }
+  .sev-warning { color: var(--amber); } .sev-critical { color: var(--red); } .sev-info { color: var(--accent); }
+  .quiet { margin: auto; text-align: center; color: var(--muted); }
+  .quiet div { font-size: 34px; margin-bottom: 6px; }
+
+  /* row 5: ask */
+  .ask { display: flex; gap: 10px; align-items: center; }
+  input, button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2);
+                  color: var(--text); padding: 10px 14px; }
+  input { flex: 1; }
+  button { cursor: pointer; }
+  #ask-log div { margin-top: 10px; font-size: 14px; line-height: 1.45; }
+  .muted-link { color: var(--muted); font-size: 12px; background: none; border: none; padding: 0; text-decoration: underline; }
+
+  @media (max-width: 1100px) {
+    .top { grid-template-columns: 1fr; height: auto; } .live { height: 360px; }
+    .tiles { grid-template-columns: repeat(3, 1fr); } .bottom { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <header>
-  <h1>🐾 Dog Behaviour Monitor</h1>
-  <span class="badge" id="mode-badge">mode: --</span>
-  <span class="badge" id="model-badge">model: --</span>
+  <span class="brand">🐾 Paw Patrol</span>
+  <span class="dog-chip" id="dog-chip"></span>
   <div class="spacer"></div>
-  <span class="badge"><span class="led-dot led-green" id="led-dot"></span> <span id="led-text">green</span> &nbsp; buzzer: <span id="buzzer-text">off</span></span>
-  <select id="replay-speed">
-    <option value="1">1x (real time)</option>
-    <option value="5">5x</option>
-    <option value="20" selected>20x (fast)</option>
-  </select>
-  <button id="replay-btn">▶ Replay demo</button>
+  <span class="pill demo" id="demo-pill" hidden>includes demo history</span>
+  <span class="pill"><span class="dot" id="status-dot"></span><span id="status-text">All calm</span></span>
+  <span class="pill"><span class="dot grey" id="ai-dot"></span><span id="ai-text">AI: mock</span></span>
 </header>
 
-<main>
-  <div class="col">
-    <div class="panel">
-      <h2>Live camera</h2>
-      <img id="frame" src="/api/frame.jpg" alt="camera feed">
-    </div>
-    <div class="panel">
-      <h2>Active alerts</h2>
-      <div id="alerts"><div class="empty">No active alerts.</div></div>
-    </div>
-    <div class="panel">
-      <h2>Event timeline</h2>
-      <div id="timeline"><div class="empty">Waiting for events...</div></div>
+<div id="alert"></div>
+
+<section class="top">
+  <div class="live">
+    <img id="video" src="/api/stream.mjpg" alt="live camera"
+         onerror="setTimeout(() => { this.src = '/api/stream.mjpg?t=' + Date.now(); }, 1000)">
+    <div class="live-tag"><span class="dot"></span>LIVE</div>
+    <div class="now">
+      <span id="now-emoji">👀</span>
+      <div><div id="now-text">No dog in view</div><div id="now-sub"></div></div>
     </div>
   </div>
 
-  <div class="col">
-    <div class="panel">
-      <h2>Latest Claude assessment</h2>
-      <div id="assessment"><div class="empty">No assessment yet.</div></div>
+  <div class="card today">
+    <div class="label"><span id="today-date">Today</span>
+      <span class="right"><span id="today-meta"></span> <button class="refresh" id="refresh-btn" title="Refresh summary">↻</button></span>
     </div>
-    <div class="panel">
-      <h2>Ask about your dog</h2>
-      <div id="ask-log"></div>
-      <div class="ask-row">
-        <input id="ask-input" type="text" placeholder="e.g. Was my dog anxious this morning?">
-        <button id="ask-btn">Ask</button>
-      </div>
-    </div>
+    <div id="today-headline">Getting to know today…</div>
+    <div id="today-story" class="empty">A summary of the day appears once there's something to report.</div>
+    <ul id="today-highlights"></ul>
+    <div id="today-check"></div>
   </div>
-</main>
+</section>
 
+<section class="tiles">
+  <div class="card tile"><div class="label">Active today</div><div class="big" id="t-active">0 min</div>
+    <div class="small" id="t-active-goal">goal 60 min</div><div class="meter"><div id="t-active-bar"></div></div></div>
+  <div class="card tile"><div class="label">Resting</div><div class="big" id="t-rest">0 min</div>
+    <div class="small" id="t-rest-sub">of time seen</div></div>
+  <div class="card tile"><div class="label">Longest nap</div><div class="big" id="t-nap">–</div>
+    <div class="small" id="t-nap-sub"></div></div>
+  <div class="card tile"><div class="label">Barks · whines</div><div class="big" id="t-sounds">0 · 0</div>
+    <div class="small" id="t-sounds-sub">microphone</div></div>
+  <div class="card tile"><div class="label">Door requests</div><div class="big" id="t-door">0</div>
+    <div class="small">paw button presses</div></div>
+  <div class="card tile"><div class="label">Collar</div><div class="big" id="t-collar">Offline</div>
+    <div class="small" id="t-collar-sub">connect to track activity</div></div>
+</section>
+
+<section class="card">
+  <div class="label"><span id="day-title">Today at a glance</span><span class="right" id="day-observed"></span></div>
+  <div class="strip-wrap"><div class="strip" id="strip"></div></div>
+  <div class="hours" id="hours"></div>
+  <div class="legend" id="legend"></div>
+</section>
+
+<section class="bottom">
+  <div class="card">
+    <div class="label">Moments</div>
+    <div class="moments" id="moments"></div>
+  </div>
+  <div class="card">
+    <div class="label">Recent changes</div>
+    <div class="changes" id="changes"></div>
+  </div>
+  <div class="card">
+    <div class="label">Alerts &amp; sounds today</div>
+    <div class="feed" id="feed"></div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="label">Ask Paw Patrol<span class="right"><button class="muted-link" id="replay-btn">replay the canned demo story</button></span></div>
+  <div class="ask">
+    <input id="ask-input" placeholder="e.g. Has Bruno been restless since I left?">
+    <button id="ask-btn">Ask</button>
+  </div>
+  <div id="ask-log"></div>
+</section>
+
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
-let citedEventIds = new Set();
 
-function fmtTime(iso) {
+// raw behaviour labels -> owner categories (must match services/summary/daily.py)
+const CAT_OF = {lying_on_chest: "resting", sitting: "calm", standing: "calm", walking: "walking",
+                trotting: "running", galloping: "running", sniffing: "exploring"};
+const CATS = {
+  resting: {name: "Resting", emoji: "😴", color: "#6c8cff"},
+  calm: {name: "Calm & awake", emoji: "🐶", color: "#9aa3b8"},
+  walking: {name: "Walking", emoji: "🐾", color: "#3ecf9a"},
+  running: {name: "Running & play", emoji: "🏃", color: "#f5b53d"},
+  exploring: {name: "Exploring", emoji: "👃", color: "#c77dff"},
+};
+const NOW_TEXT = {lying_on_chest: "Lying down", sitting: "Sitting", standing: "Standing", walking: "Walking",
+                  trotting: "Running", galloping: "Running", sniffing: "Sniffing around", detecting: "Looking…"};
+const ALERT_TEXT = {
+  repeated_barking_window: "Barked repeatedly (3+ times in a minute)",
+  sustained_whining: "Whined for a while (15 s+ in a minute)",
+  prolonged_distress: "Kept barking or whining for 2 minutes",
+  dog_button_request: "Pressed the door button",
+};
+
+let summary = null, current = null, dogName = "your dog";
+
+const hm = (iso) => new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+function dur(secs) {
+  secs = Math.round(secs);
+  if (secs < 60) return secs + "s";
+  const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
+  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m} min`;
+}
+function ago(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  return hm(iso);
+}
+const thumbHtml = (item, cls, emoji) => item.thumb
+  ? `<img class="${cls}" src="/api/events/${item.event_id}/thumb.jpg" alt="">`
+  : `<div class="${cls} ph">${emoji}</div>`;
+
+// ---------- live (1 s) ----------
+function renderNow() {
+  if (!current) {
+    $("now-emoji").textContent = "👀"; $("now-text").textContent = "No dog in view"; $("now-sub").textContent = "";
+    return;
+  }
+  const cat = CATS[CAT_OF[current.label]];
+  $("now-emoji").textContent = current.label === "detecting" ? "🔍" : (cat ? cat.emoji : "🐕");
+  $("now-text").textContent = NOW_TEXT[current.label] || current.label;
+  const parts = [];
+  const latest = summary && summary.changes[0];
+  if (latest && cat && latest.cat === CAT_OF[current.label]) parts.push("for " + dur(latest.seconds));
+  parts.push(current.label === "detecting" ? "waiting for Claude" : current.source === "claude" ? "seen by Claude" : "rough estimate");
+  $("now-sub").textContent = parts.join(" · ");
+}
+
+function renderStatus(state) {
+  const led = state.device.led || "green";
+  $("status-dot").className = "dot " + led;
+  $("status-text").textContent = led === "red" ? "Urgent" : led === "amber" ? "Needs a look" : "All calm";
+  const active = state.alerts.filter(a => a.status === "active");
+  const el = $("alert");
+  if (!active.length) { el.className = ""; el.textContent = ""; return; }
+  const order = {critical: 0, warning: 1, info: 2};
+  const top = active.slice().sort((a, b) => order[a.severity] - order[b.severity])[0];
+  el.className = top.severity;
+  el.textContent = (top.severity === "critical" ? "🚨 " : "⚠️ ") + (ALERT_TEXT[top.rule_id] || top.message)
+                   + " · " + hm(top.triggered_at);
+}
+
+async function pollState() {
   try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], {hour12: false});
-  } catch (e) { return iso; }
+    const state = await (await fetch("/api/state")).json();
+    current = state.current;
+    renderNow();
+    renderStatus(state);
+  } catch (e) { console.error(e); }
 }
 
-function renderDevice(device) {
-  const led = device.led || "green";
-  $("led-dot").className = "led-dot led-" + led;
-  $("led-text").textContent = led;
-  $("buzzer-text").textContent = device.buzzer ? "ON" : "off";
-  $("buzzer-text").className = device.buzzer ? "buzzer-on" : "";
+// ---------- summary (5 s) ----------
+function renderToday(s, d) {
+  $("today-date").textContent = "Today · " + s.date;
+  if (!d) return;
+  const live = d.model !== "mock";
+  $("ai-dot").className = "dot " + (live ? "" : "grey");
+  $("ai-text").textContent = live ? "AI: Claude (live)" : "AI: mock";
+  $("today-headline").textContent = d.headline;
+  $("today-story").className = ""; $("today-story").textContent = d.story;
+  $("today-highlights").innerHTML = d.highlights.map(h => `<li>${h}</li>`).join("");
+  $("today-check").innerHTML = `<span>${d.check.startsWith("Nothing") ? "✅" : "👉"}</span><span>${d.check}</span>`;
+  $("today-meta").textContent = "updated " + hm(d.generated_at);
 }
 
-function renderModeBadge(mode) {
-  $("mode-badge").textContent = "mode: " + mode;
+function renderTiles(s) {
+  const goal = s.activity_goal_s;
+  $("t-active").textContent = dur(s.active_s);
+  $("t-active-goal").textContent = `of ${dur(goal)} goal`;
+  $("t-active-bar").style.width = Math.min(100, 100 * s.active_s / Math.max(1, goal)) + "%";
+  $("t-rest").textContent = dur(s.rest_s);
+  $("t-rest-sub").textContent = s.observed_s ? `${Math.round(100 * s.rest_s / s.observed_s)}% of time seen` : "of time seen";
+  $("t-nap").textContent = s.longest_rest ? dur(s.longest_rest.seconds) : "–";
+  $("t-nap-sub").textContent = s.longest_rest ? "from " + hm(s.longest_rest.start) : "no long nap yet";
+  $("t-sounds").textContent = `${s.barks} · ${s.whines}`;
+  $("t-door").textContent = s.button_presses;
+  $("t-collar").textContent = s.collar.connected ? "Online" : "Offline";
+  $("t-collar-sub").textContent = s.collar.connected ? `${s.collar.events} readings today` : "connect to track activity";
 }
 
-function renderAlerts(alerts) {
-  const active = alerts.filter(a => a.status === "active");
-  const el = $("alerts");
-  if (active.length === 0) {
-    el.innerHTML = '<div class="empty">No active alerts.</div>';
-    return;
-  }
-  el.innerHTML = active.slice().reverse().map(a => `
-    <div class="alert-row sev-${a.severity}">
-      <span class="alert-sev-label">${a.severity}</span>
-      <span>${a.message}</span>
-    </div>
-  `).join("");
-}
-
-function renderTimeline(events) {
-  const el = $("timeline");
-  if (events.length === 0) {
-    el.innerHTML = '<div class="empty">Waiting for events...</div>';
-    return;
-  }
-  el.innerHTML = events.slice().reverse().map(e => {
-    const cited = citedEventIds.has(e.event_id) ? "cited" : "";
-    return `
-      <div class="evt-row ${cited}">
-        <span class="evt-time">${fmtTime(e.started_at)}</span>
-        <span class="evt-source">${e.source}</span>
-        <span>${e.label}${cited ? " ⭐" : ""}</span>
-        <span class="evt-zone">${e.zone}</span>
-      </div>
-    `;
+function renderDay(s) {
+  const tl = s.timeline, start = new Date(tl.start);
+  $("day-title").textContent = `${dogName}'s day`;
+  $("day-observed").textContent = s.observed_s ? `seen for ${dur(s.observed_s)}` : "";
+  $("strip").innerHTML = tl.buckets.map((b, i) => {
+    const t = new Date(start.getTime() + i * tl.bucket_min * 60000);
+    const c = b.cat ? CATS[b.cat] : null;
+    const title = `${hm(t.toISOString())} · ${c ? c.name : "not seen"}${b.sounds ? ` · ${b.sounds} sound(s)` : ""}`;
+    return `<div title="${title}" class="${b.sounds ? "sound" : ""}" style="background:${c ? c.color : "transparent"}"></div>`;
   }).join("");
-}
-
-function renderAssessment(triageResults) {
-  const el = $("assessment");
-  const modelBadge = $("model-badge");
-  if (!triageResults || triageResults.length === 0) {
-    el.innerHTML = '<div class="empty">No assessment yet.</div>';
-    citedEventIds = new Set();
-    modelBadge.textContent = "model: --";
-    modelBadge.className = "badge";
-    return;
+  // an hour label every hour (or every 2-3 h on long days)
+  const perHour = 60 / tl.bucket_min, hours = Math.ceil(tl.buckets.length / perHour);
+  const every = hours > 14 ? 3 : hours > 8 ? 2 : 1;
+  let html = "";
+  for (let h = 0; h < hours; h++) {
+    const t = new Date(start.getTime() + h * 3600000);
+    html += `<span style="flex:${Math.min(perHour, tl.buckets.length - h * perHour)}">${h % every ? "" : t.getHours() + ":00"}</span>`;
   }
-  const t = triageResults[triageResults.length - 1];
-  citedEventIds = new Set(t.evidence_event_ids || []);
-  const isMock = (t.model || "mock") === "mock";
-  modelBadge.textContent = "model: " + t.model;
-  modelBadge.className = "badge";
-  el.innerHTML = `
-    <div class="assessment-decision decision-${t.decision}">${t.decision.replace("_", " ")}</div>
-    <div class="assessment-msg">${t.owner_message}</div>
-    <div class="assessment-meta">
-      <b>Confidence:</b> ${(t.confidence * 100).toFixed(0)}%
-      &nbsp;<span class="model-chip ${isMock ? "mock" : "live"}">${isMock ? "MOCK" : t.model}</span><br>
-      <b>Uncertainty:</b> ${t.uncertainty}<br>
-      <b>Suggested check:</b> ${t.suggested_check || "--"}<br>
-      <b>Cited events:</b> ${(t.evidence_event_ids || []).join(", ") || "none"}
-      ${(t.referenced_alert_ids || []).length ? "<br><b>Cited alerts:</b> " + t.referenced_alert_ids.join(", ") : ""}
-    </div>
-  `;
+  $("hours").innerHTML = html;
+  $("legend").innerHTML = s.categories.map(c =>
+    `<span><i style="background:${c.color}"></i>${c.emoji} ${c.name}<b>${dur(c.seconds)}</b></span>`).join("");
 }
 
-async function poll() {
+function renderMoments(s) {
+  const tiles = s.moments.map(m => `<div class="moment">${thumbHtml(m, "", m.emoji)}
+      <div class="cap"><b>${hm(m.time)}</b>${m.caption}</div></div>`);
+  while (tiles.length < 6) tiles.push(`<div class="moment blank"></div>`);
+  $("moments").innerHTML = tiles.join("");
+}
+
+function renderChanges(s) {
+  const rows = s.changes.map((c, i) => {
+    const isNow = i === 0 && current && CAT_OF[current.label] === c.cat;
+    return `<div class="change">${thumbHtml(c, "", c.emoji)}
+      <div class="txt"><b>${c.emoji} ${c.name}</b><span>for ${dur(c.seconds)}</span></div>
+      <span class="when ${isNow ? "now" : ""}">${isNow ? "now" : ago(c.end)}</span></div>`;
+  });
+  while (rows.length < 5) rows.push(`<div class="change blank"></div>`);  // fixed 5 slots
+  $("changes").innerHTML = rows.join("");
+}
+
+function renderFeed(s) {
+  const items = [
+    ...s.alerts.map(a => ({time: a.time, html: `<span class="sev-${a.severity}">${a.severity === "critical" ? "🚨" : "⚠️"} ${ALERT_TEXT[a.rule_id] || a.message}</span>`})),
+    ...s.sounds.map(x => ({time: x.time, html: x.label === "barking" ? "🔊 Barked" : "😢 Whined"})),
+  ].sort((a, b) => b.time.localeCompare(a.time));
+  $("feed").innerHTML = items.length
+    ? items.map(i => `<div class="feed-row"><span class="t">${hm(i.time)}</span>${i.html}</div>`).join("")
+    : `<div class="quiet"><div>🌿</div>All quiet today</div>`;
+}
+
+let lastSummaryKey = "";
+async function pollSummary() {
   try {
-    const res = await fetch("/api/state");
-    const state = await res.json();
-    renderModeBadge(state.mode);
-    renderDevice(state.device);
-    renderAssessment(state.triage_results);
-    renderAlerts(state.alerts);
-    renderTimeline(state.events);
-  } catch (e) {
-    console.error("poll failed", e);
-  }
-  $("frame").src = "/api/frame.jpg?t=" + Date.now();
+    const {summary: s, digest: d} = await (await fetch("/api/summary")).json();
+    summary = s;
+    const p = s.profile || {};
+    dogName = p.name || "Your dog";
+    $("dog-chip").textContent = [p.name, p.breed, p.age].filter(Boolean).join(" · ");
+    $("ask-input").placeholder = `e.g. Has ${dogName} been restless since I left?`;
+    $("demo-pill").hidden = !s.includes_demo_data;
+    renderToday(s, d);
+    renderTiles(s);
+    // heavier panels only re-render when their content changes (avoids image flicker)
+    const key = JSON.stringify([s.timeline.buckets.length, s.observed_s, s.moments, s.changes, s.alerts, s.sounds,
+                                current && current.label]);
+    if (key !== lastSummaryKey) {
+      lastSummaryKey = key;
+      renderDay(s); renderMoments(s); renderChanges(s); renderFeed(s);
+    }
+  } catch (e) { console.error(e); }
 }
+
+$("refresh-btn").addEventListener("click", async () => {
+  $("today-meta").textContent = "refreshing…";
+  await fetch("/api/digest/refresh", {method: "POST"});
+  setTimeout(pollSummary, 4000);
+});
 
 $("replay-btn").addEventListener("click", async () => {
-  const speed = parseFloat($("replay-speed").value);
-  $("replay-btn").disabled = true;
-  try {
-    await fetch("/api/replay", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({speed}),
-    });
-  } catch (e) { console.error(e); }
-  setTimeout(() => { $("replay-btn").disabled = false; }, 2000);
+  await fetch("/api/replay", {method: "POST", headers: {"Content-Type": "application/json"},
+                              body: JSON.stringify({speed: 5})});
 });
 
 $("ask-btn").addEventListener("click", async () => {
-  const input = $("ask-input");
-  const question = input.value.trim();
+  const question = $("ask-input").value.trim();
   if (!question) return;
-  const log = $("ask-log");
-  const qDiv = document.createElement("div");
-  qDiv.className = "ask-q";
-  qDiv.textContent = "Q: " + question;
-  log.appendChild(qDiv);
-  const aDiv = document.createElement("div");
-  aDiv.className = "ask-a";
-  aDiv.textContent = "...";
-  log.appendChild(aDiv);
-  log.scrollTop = log.scrollHeight;
-  input.value = "";
+  const q = document.createElement("div"); q.innerHTML = "<b>You:</b> "; q.append(question);
+  const a = document.createElement("div"); a.textContent = "…";
+  $("ask-log").prepend(q, a);
+  $("ask-input").value = "";
   try {
-    const res = await fetch("/api/ask", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({question}),
-    });
-    const data = await res.json();
-    aDiv.textContent = `A (${data.model}): ${data.answer}`;
-  } catch (e) {
-    aDiv.textContent = "Error asking the assistant.";
-  }
-  log.scrollTop = log.scrollHeight;
+    const data = await (await fetch("/api/ask", {method: "POST", headers: {"Content-Type": "application/json"},
+                                                 body: JSON.stringify({question})})).json();
+    a.innerHTML = `<b>${data.model === "mock" ? "Mock" : "Paw Patrol"}:</b> `; a.append(data.answer);
+  } catch (e) { a.textContent = "Couldn't reach the assistant."; }
 });
+$("ask-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("ask-btn").click(); });
 
-$("ask-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("ask-btn").click();
-});
-
-poll();
-setInterval(poll, 1000);
+pollState(); pollSummary();
+setInterval(pollState, 1000);
+setInterval(pollSummary, 5000);
 </script>
 </body>
 </html>

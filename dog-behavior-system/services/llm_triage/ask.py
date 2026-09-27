@@ -3,12 +3,14 @@ dashboard already shows -- never invents new events, and says plainly when it's 
 from __future__ import annotations
 
 import json
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from services.llm_common import call_claude_json
 
-SYSTEM_PROMPT = """You are answering a dog owner's question about their Labrador's recent \
-monitored behaviour, using ONLY the recent context packets and triage results provided below. \
+SYSTEM_PROMPT = """You are Paw Patrol, answering a dog owner's question about their dog's \
+monitored behaviour today, using ONLY the day summary, day log (local times), and recent context \
+provided below. Answer in plain language without ids or technical terms. \
 Do not claim to know the dog's internal state for certain -- hedge appropriately. If the \
 provided history doesn't contain enough information to answer, say so plainly instead of \
 guessing or inventing events. Keep answers to 2-4 sentences. Respond with only the required \
@@ -44,10 +46,16 @@ def _mock_answer(question: str, packets: List[dict], triage_results: List[dict])
     return {"answer": "(mock) No triage results yet, but events are being recorded.", "based_on_context": False}
 
 
-def answer(question: str, packets: List[dict], triage_results: List[dict]) -> dict:
-    context_text = json.dumps(
-        {"recent_context_packets": packets[-3:], "recent_triage_results": triage_results[-3:]}, indent=2
-    )
+def answer(question: str, packets: List[dict], triage_results: List[dict],
+           day_summary: Optional[dict] = None) -> dict:
+    context = {"recent_context_packets": packets[-2:], "recent_triage_results": triage_results[-2:]}
+    if day_summary:
+        from services.summary.digest import _compact
+        context["today"] = _compact(day_summary)
+        context["day_log"] = [{"from": datetime.fromisoformat(g["start"]).strftime("%H:%M"),
+                                "activity": g["cat"], "minutes": round(g["seconds"] / 60, 1)}
+                               for g in day_summary.get("log", [])]
+    context_text = json.dumps(context, indent=1)
     user_text = f"Owner question: {question}\n\nRecent history (JSON):\n{context_text}"
     data, model_label = call_claude_json(
         SYSTEM_PROMPT, [{"type": "text", "text": user_text}], SCHEMA, max_tokens=400
