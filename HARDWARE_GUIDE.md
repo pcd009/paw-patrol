@@ -249,6 +249,9 @@ Galloping probably won't happen on command, and that's fine: we say "supported, 
 
 ## 8. For the software track: reading the collar data
 
+> The complete, up-to-date interface spec is in **`docs/COLLAR_DATA.md`**, with helpers in `tools/collar_data.py`.
+> This section is a short summary.
+
 The receiver always saves to a session folder: `sessions/<date_time>/` by default, or the folder given with
 `--out sessions/dog1`. **`sessions/current.txt`** holds the path of the folder being written right now.
 All files are written live, so they're safe to read while the receiver runs.
