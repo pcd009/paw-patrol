@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,7 @@ from services.context_rules.engine import build_context, evaluate_rules, resolve
 from services.llm_triage.ask import answer as llm_answer
 from services.llm_triage.triage import triage as llm_triage
 from services.summary.daily import compute_summary
+from services.summary.demo_story import build_demo_story
 from services.summary.digest import daily_digest
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -62,9 +64,18 @@ class Store:
         self.replay_running = False
         self.lock = threading.RLock()
         # the owner's day survives restarts: reload today's events/alerts from disk
-        self.day = history.local_today()
-        self.events, self.alerts = history.load_day(self.day)
-        resolve_stale(self.alerts, datetime.now(timezone.utc))
+        # live: start from scratch, only this run's events.  demo: a ~3 h sample story ending
+        # now, then this run's live events on top. Either way each run records to its own file.
+        self.session_mode = os.environ.get("PAWPATROL_MODE", "live")
+        self.session_started = datetime.now(timezone.utc)
+        history.start_session(self.session_mode)
+        if self.session_mode == "demo":
+            self.events, self.alerts, story_thumbs = build_demo_story(self.session_started)
+            for event_id, jpeg in story_thumbs.items():
+                history.save_thumb(event_id, jpeg)
+            print(f"[demo] loaded a {len(self.events)}-event sample story; live events add on top")
+        else:
+            self.events, self.alerts = [], []
         self.digest: Optional[dict] = None
         self.digest_at = 0.0
         self.digest_event_count = -1
@@ -141,10 +152,6 @@ def maybe_run_triage() -> None:
 def ingest_event(event: dict, persist: bool = True) -> None:
     validate(event, "behavior_event")
     with store.lock:
-        if history.local_today() != store.day:  # midnight: start a fresh day
-            store.day = history.local_today()
-            store.events, store.alerts = [], []
-            store.digest, store.digest_event_count = None, -1
         store.events.append(event)
         if persist:
             history.append("event", event)
@@ -313,7 +320,7 @@ async def post_ask(request: Request):
         packets = list(store.context_packets)
         triage_results = list(store.triage_results)
         events, alerts = list(store.events), list(store.alerts)
-    day = compute_summary(events, alerts, profile=_profile())
+    day = _summary(events, alerts)
     result = llm_answer(question, packets, triage_results, day_summary=day)
     return result
 
@@ -397,6 +404,11 @@ def _profile() -> dict:
     return cfg_get("dog", default={}) or {}
 
 
+def _summary(events: list, alerts: list) -> dict:
+    since = store.session_started if store.session_mode == "live" else None
+    return compute_summary(events, alerts, profile=_profile(), has_thumb=history.has_thumb, since=since)
+
+
 def _maybe_refresh_digest(force: bool = False) -> None:
     """Regenerate the Claude "today" story in the background: first time, on demand, or every
     DIGEST_INTERVAL_S if new events arrived. Never blocks a request."""
@@ -410,7 +422,7 @@ def _maybe_refresh_digest(force: bool = False) -> None:
 
     def worker():
         try:
-            summary = compute_summary(events, alerts, profile=_profile(), has_thumb=history.has_thumb)
+            summary = _summary(events, alerts)
             digest = daily_digest(summary)
             with store.lock:
                 store.digest, store.digest_at = digest, time.time()
@@ -430,9 +442,10 @@ async def get_summary():
     with store.lock:
         events, alerts = list(store.events), list(store.alerts)
         digest = store.digest
-    summary = compute_summary(events, alerts, profile=_profile(), has_thumb=history.has_thumb)
+    summary = _summary(events, alerts)
     _maybe_refresh_digest()
-    return {"summary": summary, "digest": digest}
+    return {"summary": summary, "digest": digest,
+            "session": {"mode": store.session_mode, "started_at": store.session_started.isoformat()}}
 
 
 @app.post("/api/digest/refresh")

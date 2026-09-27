@@ -11,7 +11,7 @@ dog:
   daily_activity_goal_min: 60   # active minutes (walking + running + exploring) per day
 
 digest:
-  min_interval_s: 300   # the Claude "today" story refreshes at most this often (if new events)
+  min_interval_s: 90    # the Claude "today" check-in refreshes at most this often (if new events)
 
 # Zones as normalized [x0, y0, x1, y1] rects over the camera frame (0..1, origin top-left).
 # The dog's zone = whichever rect contains the bbox-centre; "unknown" if none match.

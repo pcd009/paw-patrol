@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 
 import requests
+from typing import Optional
 
 from app.config import get as cfg_get
 from app.io.inputs import AudioSource, VideoSource
@@ -71,9 +72,10 @@ def run_display(vs: VideoSource, detector: VideoDetector, server: str, fps: floa
             time.sleep(max(0.0, min_period - (time.monotonic() - started)))
 
 
-def run_video(video_src: str, server: str, subject_id: str, shared_zone: SharedZone) -> None:
+def run_video(video_src: str, server: str, subject_id: str, shared_zone: SharedZone,
+              loop: Optional[bool] = None) -> None:
     vs = VideoSource(video_src, target_fps=cfg_get("adapters", "video_fps_sample", default=8),
-                     loop_files=cfg_get("adapters", "loop_video_files", default=True)).start()
+                     loop_files=cfg_get("adapters", "loop_video_files", default=True) if loop is None else loop).start()
     detector = VideoDetector(vs)
     threading.Thread(target=run_display, daemon=True,
                      args=(vs, detector, server, cfg_get("adapters", "display_fps", default=0))).start()
@@ -123,6 +125,10 @@ def main() -> None:
     ap.add_argument("--audio", default=None, help='"mic", or a wav/mp4 file path')
     ap.add_argument("--server", default="http://localhost:8000")
     ap.add_argument("--subject-id", default=None)
+    ap.add_argument("--loop", dest="loop", action="store_true", default=None,
+                    help="restart a video file when it ends (default: config adapters.loop_video_files)")
+    ap.add_argument("--no-loop", dest="loop", action="store_false",
+                    help="play a video file once, e.g. a recorded session")
     args = ap.parse_args()
 
     subject_id = args.subject_id or cfg_get("subject_id", default="demo_dog_01")
@@ -131,7 +137,12 @@ def main() -> None:
     threads = []
     if args.video is not None:
         threads.append(threading.Thread(
-            target=run_video, args=(args.video, args.server, subject_id, shared_zone), daemon=True))
+            target=run_video, args=(args.video, args.server, subject_id, shared_zone, args.loop), daemon=True))
+    if args.audio is None and args.video and not args.video.isdigit() and "://" not in args.video:
+        from app.io.media import has_audio
+        if has_audio(args.video):  # a clip with sound: listen to it too
+            args.audio = args.video
+            print(f"[run] {args.video} has an audio track -- running the bark/whine detector on it")
     if args.audio is not None:
         threads.append(threading.Thread(
             target=run_audio, args=(args.audio, args.server, subject_id, shared_zone), daemon=True))

@@ -152,7 +152,11 @@ class AudioSource:
 
     def _file_chunks(self) -> Iterator["np.ndarray"]:
         import librosa
-        y, _sr = librosa.load(self.source, sr=self.sample_rate, mono=True)
+        src = self.source
+        if not str(src).lower().endswith((".wav", ".flac", ".ogg")):
+            from app.io.media import extract_wav  # e.g. the audio track of an .mp4 clip
+            src = extract_wav(src, self.sample_rate)
+        y, _sr = librosa.load(src, sr=self.sample_rate, mono=True)
         block = int(self.sample_rate * self.chunk_s)
         for i in range(0, len(y), block):
             chunk = y[i:i + block]

@@ -26,9 +26,15 @@
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
   .dot.amber { background: var(--amber); } .dot.red { background: var(--red); } .dot.grey { background: var(--muted); }
 
-  #alert { display: none; border-radius: 14px; padding: 14px 18px; font-weight: 600; margin-bottom: 16px; }
-  #alert.warning, #alert.info { display: block; background: #3a2e12; color: var(--amber); }
-  #alert.critical { display: block; background: #3d1717; color: var(--red); }
+  #alert { display: none; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
+  #alert.warning, #alert.info { display: inline-block; background: #3a2e12; color: var(--amber); }
+  #alert.critical { display: inline-block; background: #3d1717; color: var(--red); }
+
+  /* the top 5 cards fill exactly one screen; whole-day views live below the fold */
+  .fold { height: calc(100vh - 66px); display: grid; grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr);
+          gap: 16px; padding-bottom: 16px; }
+  .fold > section { margin: 0; min-height: 0; }
 
   .card { background: var(--panel); border-radius: 16px; padding: 18px; }
   .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
@@ -36,9 +42,11 @@
   .label .right { margin-left: auto; text-transform: none; letter-spacing: 0; }
   .empty { color: var(--muted); font-size: 14px; }
   section { margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 26px 0 12px; }
+  .section-title span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
 
   /* row 1: live + today */
-  .top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; height: 440px; }
+  .top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; }
   .live { position: relative; background: #000; border-radius: 16px; overflow: hidden; }
   #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   .live-tag { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,.6); padding: 4px 10px;
@@ -51,11 +59,19 @@
   #now-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
 
   .today { display: flex; flex-direction: column; overflow: hidden; }
-  #today-headline { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 10px; }
-  #today-story { font-size: 16px; line-height: 1.5; color: #d5d8e3; }
-  #today-highlights { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px; }
-  #today-highlights li { background: var(--panel2); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
-  #today-check { margin-top: auto; padding-top: 14px; font-size: 14px; display: flex; gap: 8px; }
+  #today-headline { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 14px; }
+  #today-parts { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .part { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 8px 0;
+          border-top: 1px solid var(--line); }
+  .part:first-child { border-top: none; }
+  .part .ico { font-size: 22px; line-height: 1.2; text-align: center; }
+  .part b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .part span { font-size: 15px; line-height: 1.45; color: #dfe2eb; }
+  #today-check { margin-top: 12px; border-radius: 12px; padding: 12px 14px; font-size: 15px; font-weight: 600;
+                 display: flex; gap: 10px; align-items: center; }
+  #today-check.ok { background: #16301f; color: #7fe3a0; }
+  #today-check.look { background: #3a2e12; color: var(--amber); }
+  #today-check:empty { display: none; }
   .refresh { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px;
              padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px; }
 
@@ -80,7 +96,7 @@
 
   /* row 4: moments / changes / alerts -- fixed height, never resize */
   .bottom { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; }
-  .bottom .card { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
+  .bottom .card { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .moments { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 10px; flex: 1; min-height: 0; }
   .moment { position: relative; border-radius: 12px; overflow: hidden; background: var(--panel2); }
   .moment img, .moment .ph { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -93,7 +109,7 @@
   .changes { display: grid; grid-template-rows: repeat(5, 1fr); flex: 1; min-height: 0; }
   .change { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); min-height: 0; }
   .change:first-child { border-top: none; }
-  .change img, .change .ph { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex: none;
+  .change img, .change .ph { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex: none;
                              background: var(--panel2); display: flex; align-items: center; justify-content: center; font-size: 22px; }
   .change .txt b { display: block; font-size: 15px; }
   .change .txt span { color: var(--muted); font-size: 13px; }
@@ -119,7 +135,9 @@
   .muted-link { color: var(--muted); font-size: 12px; background: none; border: none; padding: 0; text-decoration: underline; }
 
   @media (max-width: 1100px) {
-    .top { grid-template-columns: 1fr; height: auto; } .live { height: 360px; }
+    .fold { height: auto; display: block; } .fold > section { margin-bottom: 16px; }
+    .top { grid-template-columns: 1fr; } .live { height: 360px; } .today { min-height: 320px; }
+    .bottom .card { height: 360px; }
     .tiles { grid-template-columns: repeat(3, 1fr); } .bottom { grid-template-columns: 1fr; }
   }
 </style>
@@ -131,13 +149,13 @@
   <span class="brand">🐾 Paw Patrol</span>
   <span class="dog-chip" id="dog-chip"></span>
   <div class="spacer"></div>
-  <span class="pill demo" id="demo-pill" hidden>includes demo history</span>
+  <div id="alert"></div>
+  <span class="pill" id="mode-pill" hidden></span>
   <span class="pill"><span class="dot" id="status-dot"></span><span id="status-text">All calm</span></span>
   <span class="pill"><span class="dot grey" id="ai-dot"></span><span id="ai-text">AI: mock</span></span>
 </header>
 
-<div id="alert"></div>
-
+<div class="fold">
 <section class="top">
   <div class="live">
     <img id="video" src="/api/stream.mjpg" alt="live camera"
@@ -154,12 +172,28 @@
       <span class="right"><span id="today-meta"></span> <button class="refresh" id="refresh-btn" title="Refresh summary">↻</button></span>
     </div>
     <div id="today-headline">Getting to know today…</div>
-    <div id="today-story" class="empty">A summary of the day appears once there's something to report.</div>
-    <ul id="today-highlights"></ul>
+    <div id="today-parts"><div class="empty">A check-in appears once there's something to report.</div></div>
     <div id="today-check"></div>
   </div>
 </section>
 
+<section class="bottom">
+  <div class="card">
+    <div class="label">Moments</div>
+    <div class="moments" id="moments"></div>
+  </div>
+  <div class="card">
+    <div class="label">Recent changes</div>
+    <div class="changes" id="changes"></div>
+  </div>
+  <div class="card">
+    <div class="label">Alerts &amp; sounds today</div>
+    <div class="feed" id="feed"></div>
+  </div>
+</section>
+</div>
+
+<div class="section-title">Whole day <span>fills in over hours of monitoring</span></div>
 <section class="tiles">
   <div class="card tile"><div class="label">Active today</div><div class="big" id="t-active">0 min</div>
     <div class="small" id="t-active-goal">goal 60 min</div><div class="meter"><div id="t-active-bar"></div></div></div>
@@ -180,21 +214,6 @@
   <div class="strip-wrap"><div class="strip" id="strip"></div></div>
   <div class="hours" id="hours"></div>
   <div class="legend" id="legend"></div>
-</section>
-
-<section class="bottom">
-  <div class="card">
-    <div class="label">Moments</div>
-    <div class="moments" id="moments"></div>
-  </div>
-  <div class="card">
-    <div class="label">Recent changes</div>
-    <div class="changes" id="changes"></div>
-  </div>
-  <div class="card">
-    <div class="label">Alerts &amp; sounds today</div>
-    <div class="feed" id="feed"></div>
-  </div>
 </section>
 
 <section class="card">
@@ -229,7 +248,7 @@ const ALERT_TEXT = {
   dog_button_request: "Pressed the door button",
 };
 
-let summary = null, current = null, dogName = "your dog";
+let summary = null, current = null, session = null, dogName = "your dog";
 
 const hm = (iso) => new Date(iso).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
 function dur(secs) {
@@ -289,16 +308,23 @@ async function pollState() {
 
 // ---------- summary (5 s) ----------
 function renderToday(s, d) {
-  $("today-date").textContent = "Today · " + s.date;
+  $("today-date").textContent = session && session.mode === "live"
+    ? "This session · since " + hm(session.started_at) : "Today · " + s.date;
   if (!d) return;
   const live = d.model !== "mock";
   $("ai-dot").className = "dot " + (live ? "" : "grey");
   $("ai-text").textContent = live ? "AI: Claude (live)" : "AI: mock";
   $("today-headline").textContent = d.headline;
-  $("today-story").className = ""; $("today-story").textContent = d.story;
-  $("today-highlights").innerHTML = d.highlights.map(h => `<li>${h}</li>`).join("");
-  $("today-check").innerHTML = `<span>${d.check.startsWith("Nothing") ? "✅" : "👉"}</span><span>${d.check}</span>`;
-  $("today-meta").textContent = "updated " + hm(d.generated_at);
+  const ICON = {"Early morning": "🌅", "Morning": "☀️", "Afternoon": "🌤️", "Evening": "🌇", "Night": "🌙"};
+  const esc = (t) => String(t).replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+  $("today-parts").innerHTML = d.parts.length
+    ? d.parts.map(p => `<div class="part"><div class="ico">${ICON[p.part] || "•"}</div>
+        <div><b>${p.part}</b><span>${esc(p.text)}</span></div></div>`).join("")
+    : '<div class="empty">Nothing observed yet today.</div>';
+  const look = d.check_level === "look";
+  $("today-check").className = look ? "look" : "ok";
+  $("today-check").innerHTML = `<span>${look ? "👉" : "✅"}</span><span>${esc(d.check)}</span>`;
+  $("today-meta").textContent = (live ? "by Claude · " : "") + "updated " + hm(d.generated_at);
 }
 
 function renderTiles(s) {
@@ -370,13 +396,18 @@ function renderFeed(s) {
 let lastSummaryKey = "";
 async function pollSummary() {
   try {
-    const {summary: s, digest: d} = await (await fetch("/api/summary")).json();
+    const r = await (await fetch("/api/summary")).json();
+    const s = r.summary, d = r.digest;
     summary = s;
     const p = s.profile || {};
     dogName = p.name || "Your dog";
     $("dog-chip").textContent = [p.name, p.breed, p.age].filter(Boolean).join(" · ");
     $("ask-input").placeholder = `e.g. Has ${dogName} been restless since I left?`;
-    $("demo-pill").hidden = !s.includes_demo_data;
+    session = r.session;
+    const demo = session.mode === "demo";
+    $("mode-pill").hidden = false;
+    $("mode-pill").className = "pill" + (demo ? " demo" : "");
+    $("mode-pill").textContent = demo ? "Demo mode · sample story + live" : "Live session · since " + hm(session.started_at);
     renderToday(s, d);
     renderTiles(s);
     // heavier panels only re-render when their content changes (avoids image flicker)

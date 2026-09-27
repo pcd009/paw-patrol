@@ -19,3 +19,4 @@ librosa
 transformers
 torch
 torchaudio
+imageio-ffmpeg

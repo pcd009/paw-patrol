@@ -1,5 +1,7 @@
 .venv/
 data/
+# demo clips: large and stock-licensed -- keep out of git even if data/ is narrowed later
+data/demo_videos/
 models/*.pt
 models/*.joblib
 __pycache__/

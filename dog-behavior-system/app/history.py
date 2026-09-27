@@ -32,12 +32,23 @@ def _day_file(day: str) -> Path:
     return HISTORY_DIR / f"{day}.jsonl"
 
 
+_session_file: Optional[Path] = None
+
+
+def start_session(mode: str) -> Path:
+    """Each server run records into its own file: data/history/sessions/<mode>_<date>_<time>.jsonl."""
+    global _session_file
+    _session_file = HISTORY_DIR / "sessions" / f"{mode}_{datetime.now():%Y-%m-%d_%H%M%S}.jsonl"
+    _session_file.parent.mkdir(parents=True, exist_ok=True)
+    return _session_file
+
+
 def append(kind: str, data: dict) -> None:
-    """kind: 'event' (keyed by started_at) or 'alert' (keyed by triggered_at)."""
+    """kind: 'event' or 'alert'. Goes to the current session file (or the day file if none)."""
     stamp = data.get("started_at") or data.get("triggered_at")
-    day = _local_day(stamp) if stamp else local_today()
+    target = _session_file or _day_file(_local_day(stamp) if stamp else local_today())
     HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-    with _lock, _day_file(day).open("a") as f:
+    with _lock, target.open("a") as f:
         f.write(json.dumps({"kind": kind, "data": data}) + "\n")
 
 

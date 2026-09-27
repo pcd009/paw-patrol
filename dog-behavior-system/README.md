@@ -15,10 +15,19 @@ Claude turns what they see into a plain-language picture of the dog's day.
   **Alerts & sounds today**, and **Ask Paw Patrol** (answers from the whole day).
 - Dog profile (name, breed, age, activity goal) lives in `config.yaml` -> `dog`.
 
-History is saved per local day in `data/history/YYYY-MM-DD.jsonl` (+ `thumbs/`) and reloaded on restart.
-For the pitch, seed a realistic day up to now (clearly badged "includes demo history" in the UI):
+## Two ways to run
 
-    .venv/bin/python -m scripts.seed_demo_day --replace
+    scripts/run_demo.sh live 0 mic                          # from scratch: only what happens from now on
+    scripts/run_demo.sh demo data/demo_videos/running-1.mp4 # ~3 h sample story, then live events on top
+
+- **live** starts empty every run -- the dashboard only shows events since you started (header: "Live session · since 14:05").
+- **demo** pre-fills a ~3-hour Labrador story ending at start time (whining when the owner left, a delivery
+  bark, naps, zoomies, a door-button request; alerts from the real rule engine), then the live video adds on top
+  (header: "Demo mode · sample story + live").
+- Each run records to its own file in `data/history/sessions/` (thumbnails in `data/history/thumbs/`).
+
+`scripts/analyze_clips.py` is an offline tool: it runs recorded clips through the same YOLO + Claude pipeline
+and writes the events to a day file, useful for checking labels on new footage.
 
 ---
 

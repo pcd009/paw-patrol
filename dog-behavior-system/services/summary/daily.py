@@ -67,7 +67,9 @@ def _groups(events: List[dict]) -> List[dict]:
 
 
 def compute_summary(events: List[dict], alerts: List[dict], now: Optional[datetime] = None,
-                    profile: Optional[dict] = None, has_thumb=lambda _id: False) -> dict:
+                    profile: Optional[dict] = None, has_thumb=lambda _id: False,
+                    since: Optional[datetime] = None) -> dict:
+    """`since`: when monitoring started (live sessions); the day timeline starts there."""
     now = (now or datetime.now()).astimezone()
     profile = profile or {}
     events = sorted(events, key=lambda e: e["started_at"])
@@ -94,9 +96,11 @@ def compute_summary(events: List[dict], alerts: List[dict], now: Optional[dateti
     # --- day timeline: 15-min buckets from the first hour seen (or 06:00) to now
     bucket_min = 15
     first = _ts(events[0]["started_at"]) if events else now
-    day_start = min(first, now).replace(minute=0, second=0, microsecond=0)
-    if day_start.hour > 6 and not events:
-        day_start = day_start.replace(hour=6)
+    if since is not None:
+        since = since.astimezone()
+        day_start = since.replace(minute=since.minute - since.minute % 15, second=0, microsecond=0)
+    else:
+        day_start = min(first, now).replace(minute=0, second=0, microsecond=0)
     n_buckets = max(1, int((now - day_start).total_seconds() // (bucket_min * 60)) + 1)
     fill = [dict.fromkeys(CATEGORIES, 0.0) for _ in range(n_buckets)]
     for e in events:
@@ -126,14 +130,20 @@ def compute_summary(events: List[dict], alerts: List[dict], now: Optional[dateti
     moments = []
     for g in groups:
         c = CATEGORIES[g["cat"]]
-        if g["cat"] == "resting" and g["seconds"] >= 20 * 60:
-            caption = f"Napped for {_fmt(g['seconds'])}"
-        elif g["cat"] == "running" and g["seconds"] >= 30:
-            caption = f"Zoomies! Played for {_fmt(g['seconds'])}"
-        elif g["cat"] == "walking" and g["seconds"] >= 3 * 60:
-            caption = f"Walked around for {_fmt(g['seconds'])}"
-        elif g["cat"] == "exploring" and g["seconds"] >= 2 * 60:
-            caption = f"Sniffed around for {_fmt(g['seconds'])}"
+        secs = g["seconds"]
+        # thresholds sized so a 10-15 min live session still produces moments
+        if g["cat"] == "resting" and secs >= 20 * 60:
+            caption = f"Napped for {_fmt(secs)}"
+        elif g["cat"] == "resting" and secs >= 90:
+            caption = f"Lay down for {_fmt(secs)}"
+        elif g["cat"] == "running" and secs >= 10:
+            caption = f"Zoomies! Played for {_fmt(secs)}"
+        elif g["cat"] == "walking" and secs >= 45:
+            caption = f"Walked around for {_fmt(secs)}"
+        elif g["cat"] == "exploring" and secs >= 20:
+            caption = f"Sniffed around for {_fmt(secs)}"
+        elif g["cat"] == "calm" and secs >= 90:
+            caption = f"Sat or stood calmly for {_fmt(secs)}"
         else:
             continue
         moments.append({"time": g["start"].isoformat(), "caption": caption, "emoji": c["emoji"],
@@ -161,6 +171,7 @@ def compute_summary(events: List[dict], alerts: List[dict], now: Optional[dateti
     return {
         "date": now.strftime("%A, %d %B"),
         "generated_at": now.isoformat(),
+        "since": (since or day_start).isoformat(),
         "profile": profile,
         "observed_s": round(observed),
         "categories": [{"key": k, "name": c["name"], "emoji": c["emoji"], "color": c["color"],
@@ -174,8 +185,10 @@ def compute_summary(events: List[dict], alerts: List[dict], now: Optional[dateti
         "barks": len(barks),
         "whines": len(whines),
         "button_presses": len(presses),
-        # seeded demo history (scripts/seed_demo_day.py) is always labelled on the dashboard
+        # demo-mode sample story (services/summary/demo_story.py) is tagged demo_seed
         "includes_demo_data": any(e.get("evidence", {}).get("detector") == "demo_seed" for e in events),
+        # real analysis of recorded clips placed at staged times (scripts/analyze_clips.py)
+        "from_recorded_clips": any("clip_id" in e.get("evidence", {}) for e in events),
         "last_event_at": _ts(events[-1]["ended_at"]).isoformat() if events else None,
         "collar": {"connected": bool(imu), "events": len(imu)},
         "timeline": {"start": day_start.isoformat(), "bucket_min": bucket_min, "buckets": buckets},
